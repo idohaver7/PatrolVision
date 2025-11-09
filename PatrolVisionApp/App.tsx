@@ -1,12 +1,18 @@
-/// app.tsx  <-- Note the .tsx extension
+// app.tsx
 
 import React from 'react';
-// Import the new screen we created
-import ViolationsHistoryScreen from './src/screens/ViolationsHistoryScreen';
+import { NavigationContainer } from '@react-navigation/native';
+import MainNavigator from './src/navigation/MainNavigator'; // <-- Import our new "department"
 
-const App = () => {
-  // Here we are telling the app to display our screen
-  return <ViolationsHistoryScreen />;
-};
+// This is the root component of the entire app
+function App() {
+  return (
+    // NavigationContainer wraps everything
+    <NavigationContainer>
+      {/* We just render our main navigator */}
+      <MainNavigator />
+    </NavigationContainer>
+  );
+}
 
 export default App;
