@@ -1,17 +1,23 @@
 // src/screens/HomeScreen.js
 import React from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text,TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import styles from './HomeScreen.styles';
 import { COLORS } from '../theme/colors';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../context/AuthContext';
+
 
 // We get 'navigation' as a prop from the navigator
 const HomeScreen = ({ navigation }) => {
-
+  const { logout } = useAuth();
+  
+  const handleLogout = () => {
+    logout();
+  }
   // Navigation functions
   const onStartDrive = () => {
-    // We'll create this screen later
-    alert('Navigate to Live Camera Screen (TODO)');
+    navigation.navigate('LiveCamera');
   };
 
   const onHistory = () => {
@@ -60,6 +66,16 @@ const HomeScreen = ({ navigation }) => {
           <Icon name="settings" size={24} style={styles.secondaryButtonIcon} />
           <Text style={[styles.buttonText, styles.secondaryButtonText]}>
             Settings
+          </Text>
+        </TouchableOpacity>
+        {/* Logout Button (Secondary) */}
+        <TouchableOpacity 
+          style={[styles.button, styles.secondaryButton]} 
+          onPress={handleLogout}
+        >
+          <Icon name="logout" size={24} style={styles.secondaryButtonIcon} />
+          <Text style={[styles.buttonText, styles.secondaryButtonText]}>
+            Log Out
           </Text>
         </TouchableOpacity>
       </View>

@@ -1,17 +1,19 @@
 // app.tsx
-
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import MainNavigator from './src/navigation/MainNavigator'; // <-- Import our new "department"
+import { AuthProvider } from './src/context/AuthContext';
+import RootNavigator from './src/navigation/RootNavigator';
 
-// This is the root component of the entire app
 function App() {
   return (
-    // NavigationContainer wraps everything
-    <NavigationContainer>
-      {/* We just render our main navigator */}
-      <MainNavigator />
-    </NavigationContainer>
+    //wrap the app with the AuthProvider
+    <AuthProvider>
+      {/* 2. Wrap everything in the navigation container */}
+      <NavigationContainer>
+        {/* 3. Show the "switchboard" that decides what to show */}
+        <RootNavigator />
+      </NavigationContainer>
+    </AuthProvider>
   );
 }
 

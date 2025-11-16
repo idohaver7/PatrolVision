@@ -1,13 +1,12 @@
-// src/navigation/MainNavigator.tsx
 
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { COLORS } from '../theme/colors';
 
-// 1. Import the new HomeScreen
 import HomeScreen from '../screens/HomeScreen'; 
 import ViolationsHistoryScreen from '../screens/ViolationsHistoryScreen';
 import ViolationDetailScreen from '../screens/ViolationDetailScreen';
+import LiveCameraScreen from '../screens/LiveCameraScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,12 +27,17 @@ const MainNavigator = () => {
       initialRouteName="Home"
     >
       
-      {/* 3. Add HomeScreen to the stack */}
+      {/* Add all screens to the navigator */}
       <Stack.Screen 
         name="Home"
         component={HomeScreen}
         // 4. We hide the header for the main home screen
         options={{ headerShown: false }} 
+      />
+      <Stack.Screen 
+        name="LiveCamera"
+        component={LiveCameraScreen}
+        options={{ headerShown: false }}
       />
 
       {/* These screens remain the same */}

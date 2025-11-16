@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect } from 'react'; // <-- 1. Import useState and useEffect
 import {
-  SafeAreaView,
   View,
   Text,
   FlatList,
   Image,
   Pressable, // <-- 2. Import Pressable (instead of TouchableOpacity)
-  ActivityIndicator, // <-- 3. Import the loading spinner
+  ActivityIndicator, 
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // <-- 4. Import the Icon library
 import styles from './ViolationsHistoryScreen.styles';
 import { COLORS } from '../theme/colors';
