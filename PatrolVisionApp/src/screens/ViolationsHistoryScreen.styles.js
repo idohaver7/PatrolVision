@@ -1,79 +1,152 @@
 // src/screens/ViolationsHistoryScreen.styles.js
-
 import { StyleSheet } from 'react-native';
 import { COLORS } from '../theme/colors';
 
 export default StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8F9FC', 
   },
+  
+  
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    margin: 16,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EFF2F5',
+    height: 50,
+    elevation: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    marginLeft: 10,
+  },
+  filtersContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    height: 40,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginRight: 8,
+    justifyContent: 'center',
+  },
+  chipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  chipText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '600',
+  },
+  chipTextSelected: {
+    color: '#fff',
+  },
+
+  // --- List Styles ---
   list: {
     flex: 1,
     paddingHorizontal: 16,
   },
   
-  // Style for the loading spinner container
+  // --- Violation Item Styles ---
+  itemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 16, 
+    marginBottom: 12,
+  
+    shadowColor: '#0D2A4D', 
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
+  },
+  itemPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.99 }],
+  },
+  
+
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  
+  detailsContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  
+  // first Line: Violation Type
+  violationType: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A202C',
+    marginBottom: 4,
+  },
+  // second Line: License Plate and Status
+    rowInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  licensePlate: {
+    fontSize: 13,
+    color: '#4A5568',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    backgroundColor: '#F7FAFC', 
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginRight: 8,
+  },
+  // status Badge
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: '#F0F0F0',
+  },
+
+  // Loader
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: COLORS.textSecondary,
-  },
-
-  // Card style
-  itemContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    transition: 'transform 0.1s ease', // (Note: 'transition' is web-only, but good practice)
-  },
-
-  // This style is applied when 'itemContainer' is pressed
-  itemPressed: {
-    transform: [{ scale: 0.98 }], // Makes the card slightly smaller
-    opacity: 0.9, // Makes the card slightly transparent
-  },
-
-  icon: {
-    marginRight: 16,
-  },
-  detailsContainer: {
-    flex: 1,
-  },
-  violationType: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-  },
-  licensePlate: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-  date: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  thumbnail: {
-    width: 60,
-    height: 40,
-    borderRadius: 4,
-    marginLeft: 16,
-  },
-  arrow: {
-    marginLeft: 8,
   },
 });

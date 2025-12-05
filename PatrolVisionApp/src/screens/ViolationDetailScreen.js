@@ -1,39 +1,116 @@
 // src/screens/ViolationDetailScreen.js
 import React from 'react';
-import { View, Text, StyleSheet, Image} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { 
+  View, 
+  Text, 
+  Image, 
+  ScrollView, 
+  TouchableOpacity, 
+  Linking 
+} from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import styles from './ViolationDetailScreen.styles';
+import { COLORS } from '../theme/colors';
 
-// This screen receives 'route' as a prop,
-// which contains the data we passed from the previous screen.
 const ViolationDetailScreen = ({ route }) => {
-  // Extract the 'violation' object from the route params
+  
+  // 1. Get the data passed directly from the History list
   const { violation } = route.params;
 
+  // --- Helper Functions ---
+  
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Verified': return '#28a745'; // Green
+      case 'Rejected': 
+      case 'Closed': return '#dc3545';   // Red
+      default: return '#ffc107';         // Yellow
+    }
+  };
+
+  const openMap = () => {
+    if (!violation.location) return;
+    // MongoDB stores as [longitude, latitude]
+    const [lng, lat] = violation.location.coordinates;
+    // Opens Google Maps (or Waze) at this location
+    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    Linking.openURL(url);
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* We can use a bigger image here */}
-        <Image source={{ uri: violation.image_url.replace('100/100', '400/300') }} style={styles.image} />
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         
-        <Text style={styles.title}>{violation.type}</Text>
-        
-        <View style={styles.detailRow}>
-          <Text style={styles.label}>License Plate:</Text>
-          <Text style={styles.value}>{violation.license_plate}</Text>
+        {/* 1. Header Image */}
+        <View style={styles.imageContainer}>
+          <Image 
+            source={{ uri: violation.mediaUrl }} 
+            style={styles.image} 
+            resizeMode="cover" 
+          />
         </View>
 
-        <View style={styles.detailRow}>
-          <Text style={styles.label}>Date & Time:</Text>
-          <Text style={styles.value}>{violation.date}</Text>
+        {/* 2. Details Card (Floating) */}
+        <View style={styles.detailsCard}>
+          
+          {/* Title & Status Badge */}
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>{violation.violationType}</Text>
+            
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(violation.status) }]}>
+              <Text style={styles.statusText}>{violation.status}</Text>
+            </View>
+          </View>
+
+          {/* Info Row: License Plate */}
+          <InfoRow 
+            icon="directions-car" 
+            label="License Plate" 
+            value={violation.licensePlate} 
+          />
+          
+          {/* Info Row: Date & Time */}
+          <InfoRow 
+            icon="event" 
+            label="Date & Time" 
+            value={`${new Date(violation.timestamp).toLocaleDateString()} • ${new Date(violation.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`} 
+          />
+
+          {/* Info Row: Location (Clickable) */}
+          <TouchableOpacity onPress={openMap}>
+            <InfoRow 
+              icon="place" 
+              label="Location" 
+              value={`${violation.address || 'Unknown Road'}\n(GPS: ${violation.location.coordinates[1].toFixed(5)}, ${violation.location.coordinates[0].toFixed(5)})`}
+              isLink 
+            />
+          </TouchableOpacity>
+
+          {/* Info Row: Reported By (Only if user info exists) */}
+          {violation.user && (
+            <InfoRow 
+              icon="person" 
+              label="Reported By" 
+              value={`${violation.user.firstName} ${violation.user.lastName}\n${violation.user.phoneNumber || ''}`} 
+            />
+          )}
+
         </View>
-        
-        {/* We can add more details here later, like GPS */}
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+    </View>
   );
 };
 
+// Helper Component for consistent rows
+const InfoRow = ({ icon, label, value, isLink }) => (
+  <View style={styles.infoRow}>
+    <Icon name={icon} size={24} color={COLORS.primary} />
+    <View style={styles.infoContent}>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.value}>{value}</Text>
+      {isLink && <Text style={styles.linkText}>Tap to open in Maps ↗</Text>}
+    </View>
+  </View>
+);
 
 export default ViolationDetailScreen;

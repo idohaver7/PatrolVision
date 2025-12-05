@@ -1,100 +1,290 @@
 // src/screens/ViolationsHistoryScreen.js
-
-import React, { useState, useEffect } from 'react'; // <-- 1. Import useState and useEffect
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   FlatList,
   Image,
-  Pressable, // <-- 2. Import Pressable (instead of TouchableOpacity)
-  ActivityIndicator, 
+  Pressable,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
+  TextInput,
+  ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/MaterialIcons'; // <-- 4. Import the Icon library
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import SkeletonCard from '../components/SkeletonCard';
 import styles from './ViolationsHistoryScreen.styles';
 import { COLORS } from '../theme/colors';
+import { useAuth } from '../context/AuthContext';
+import { fetchViolations } from '../services/api';
 
-// Mock Data (unchanged)
-const MOCK_VIOLATIONS = [
-  { id: '1', type: 'Illegal Overtaking', license_plate: 'DEF 7890', date: 'Nov 30, 2023, 9:41 AM', image_url: 'https://picsum.photos/seed/1/100/100' },
-  { id: '2', type: 'Red Light Violation', license_plate: 'ABC 1254', date: 'May 15, 2022, 11:14 AM', image_url: 'https://picsum.photos/seed/2/100/100' },
-  { id: '3', type: 'Wrong Way Driving', license_plate: 'GFH 0867', date: 'Aug 25, 2021, 8:05 AM', image_url: 'https://picsum.photos/seed/3/100/100' },
+const FILTER_TYPES = [
+  { id: 'all', label: 'All' },
+  { id: 'Red Light Violation', label: 'Red Light' },
+  { id: 'Illegal Overtaking', label: 'Overtaking' },
+  { id: 'Wrong Way Driving', label: 'Wrong Way' },
+  { id: 'Illegal Parking', label: 'Parking' },
 ];
 
-// 5. We use Pressable for a better press effect
-const ViolationItem = ({ item, onPress }) => (
-  <Pressable
-    onPress={onPress}
-    // This style applies effects when the item is pressed
-    style={({ pressed }) => [
-      styles.itemContainer,
-      pressed && styles.itemPressed, // <-- 6. Apply "pressed" style
-    ]}
-  >
-    {/* 7. Replaced the ⚠️ emoji with a real icon */}
-    <Icon name="warning" size={30} color={COLORS.warning} style={styles.icon} />
-    
-    <View style={styles.detailsContainer}>
-      <Text style={styles.violationType}>{item.type}</Text>
-      <Text style={styles.licensePlate}>{item.license_plate}</Text>
-      <Text style={styles.date}>{item.date}</Text>
-    </View>
-    
-    <Image source={{ uri: item.image_url }} style={styles.thumbnail} />
-    
-    {/* 8. Replaced the ❯ emoji with a real icon */}
-    <Icon name="chevron-right" size={30} color="#aaa" style={styles.arrow} />
-  </Pressable>
-);
+const getViolationStyle = (type) => {
+  switch (type) {
+    case 'Red Light Violation':
+      return { icon: 'traffic', color: '#D93025', bg: '#FCE8E6' };
+    case 'Illegal Overtaking':
+      return { icon: 'compare-arrows', color: '#F9AB00', bg: '#FEF7E0' };
+    case 'Wrong Way Driving':
+      return { icon: 'block', color: '#C5221F', bg: '#FCE8E6' };
+    case 'Illegal Parking':
+      return { icon: 'local-parking', color: '#1976D2', bg: '#EBF8FF' };
+    case 'Illegal Turn':
+      return { icon: 'alt-route', color: '#A142F4', bg: '#F3E5F5' };
+    default:
+      return { icon: 'error-outline', color: '#5F6368', bg: '#F1F3F4' };
+  }
+};
+
+const getStatusTheme = (status) => {
+  switch (status) {
+    case 'Verified':
+      return { bg: '#E6F4EA', text: '#1E8E3E', label: 'Verified' };
+    case 'Rejected':
+    case 'Closed':
+      return { bg: '#FCE8E6', text: '#C5221F', label: 'Rejected' };
+    case 'Pending Review':
+    default:
+      return { bg: '#FEF7E0', text: '#B06000', label: 'Pending' };
+  }
+};
+
+const ViolationItem = ({ item, onPress }) => {
+  const statusTheme = getStatusTheme(item.status);
+  const violationStyle = getViolationStyle(item.violationType);
+  
+  const locationText = item.address || 
+    (item.location ? `${item.location.coordinates[1].toFixed(4)}, ${item.location.coordinates[0].toFixed(4)}` : 'Unknown Location');
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.itemContainer, pressed && styles.itemPressed]}
+    >
+      <View style={[styles.iconContainer, { backgroundColor: violationStyle.bg }]}>
+        <Icon 
+          name={violationStyle.icon} 
+          size={24} 
+          color={violationStyle.color} 
+        />
+      </View>
+      
+      <View style={styles.detailsContainer}>
+        <Text style={styles.violationType} numberOfLines={1}>
+          {item.violationType}
+        </Text>
+
+        <View style={styles.rowInfo}>
+          <Text style={styles.licensePlate}>{item.licensePlate}</Text>
+          <Text style={{ fontSize: 12, color: '#A0AEC0' }}>•</Text>
+          <Text style={styles.dateText}>
+            {new Date(item.timestamp).toLocaleDateString()}
+          </Text>
+        </View>
+
+        <View style={styles.rowInfo}>
+          <Icon name="place" size={14} color="#718096" style={{ marginRight: 4 }} />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {locationText}
+          </Text>
+        </View>
+
+        <View style={[styles.statusBadge, { backgroundColor: statusTheme.bg }]}>
+          <Text style={[styles.statusText, { color: statusTheme.text }]}>
+            {statusTheme.label}
+          </Text>
+        </View>
+      </View>
+      
+      <Image source={{ uri: item.mediaUrl }} style={styles.thumbnail} resizeMode="cover" />
+    </Pressable>
+  );
+};
 
 const ViolationsHistoryScreen = ({ navigation }) => {
-  // 9. Add loading state. Default to 'true'
+  const { token } = useAuth();
+
+  const [violations, setViolations] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  const [selectedType, setSelectedType] = useState('all');
+  const [searchText, setSearchText] = useState('');       
+  const [sortOrder, setSortOrder] = useState('newest');
 
-  // 10. Simulate a network request when the screen loads
-  useEffect(() => {
-    // Wait for 1.5 seconds, then "load" the data
-    const timer = setTimeout(() => {
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const loadViolations = useCallback(async (pageNumber, shouldRefresh = false) => {
+    if (!token) return;
+    
+    if (shouldRefresh && pageNumber === 1) setIsLoading(true);
+
+    try {
+      const params = { 
+        page: pageNumber, 
+        limit: 10, 
+        sort: sortOrder,
+      };
+
+      if (selectedType !== 'all') params.type = selectedType;
+      if (searchText.length > 0) params.licensePlate = searchText;
+
+      const response = await fetchViolations(token, params);
+      const serverResponse = response.data; 
+      const newViolations = serverResponse.data || []; 
+
+      if (!Array.isArray(newViolations)) {
+        console.error("Data format error: Expected array, got", newViolations);
+        return; 
+      }
+
+      if (shouldRefresh) {
+        setViolations(newViolations);
+      } else {
+        setViolations(prev => [...prev, ...newViolations]);
+      }
+
+      setHasMore(!!serverResponse.pagination?.next);
+
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Could not load violations');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+      setIsRefreshing(false);
+      setIsLoadingMore(false);
+    }
+  }, [token, selectedType, searchText, sortOrder]);
 
-    // Clear the timer if the component unmounts
-    return () => clearTimeout(timer);
-  }, []); // The empty array [] means this runs only once
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      setPage(1);
+      setHasMore(true);
+      loadViolations(1, true);
+    }, 500);
 
-  const handleItemPress = (violation) => {
-    navigation.navigate('ViolationDetail', { violation: violation });
+    return () => clearTimeout(delayDebounce);
+  }, [selectedType, searchText, sortOrder, loadViolations]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setPage(1);
+    setHasMore(true);
+    loadViolations(1, true);
   };
 
-  // 11. This is the new loading component
-  const renderLoader = () => (
-    <View style={styles.loaderContainer}>
-      <ActivityIndicator size="large" color={COLORS.primary} />
-      <Text style={styles.loadingText}>Loading Violations...</Text>
+  const handleLoadMore = () => {
+    if (!hasMore || isLoadingMore || isLoading) return;
+    setIsLoadingMore(true);
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadViolations(nextPage, false);
+  };
+
+  const renderFooter = () => {
+    if (!isLoadingMore) return <View style={{ height: 20 }} />;
+    return <View style={{ paddingVertical: 20 }}><ActivityIndicator size="small" color={COLORS.primary} /></View>;
+  };
+
+  const renderFilters = () => (
+    <View>
+      <View style={styles.searchContainer}>
+        <Icon name="search" size={24} color="#999" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search License Plate..."
+          value={searchText}
+          onChangeText={setSearchText}
+          autoCapitalize="characters"
+        />
+        {searchText.length > 0 && (
+          <Pressable onPress={() => setSearchText('')}>
+            <Icon name="close" size={20} color="#999" />
+          </Pressable>
+        )}
+      </View>
+
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={styles.filtersContainer}
+        contentContainerStyle={{ paddingRight: 16 }}
+      >
+        {FILTER_TYPES.map((type) => (
+          <Pressable
+            key={type.id}
+            style={[
+              styles.chip,
+              selectedType === type.id && styles.chipSelected
+            ]}
+            onPress={() => setSelectedType(type.id)}
+          >
+            <Text style={[
+              styles.chipText,
+              selectedType === type.id && styles.chipTextSelected
+            ]}>
+              {type.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
     </View>
   );
 
-  // 12. This is the main list component
-  const renderList = () => (
-    <SafeAreaView style={styles.safeArea}>
+  // --- Main Render Logic ---
+
+  // 1. If Loading (Initial Load) -> Show Skeleton
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {renderFilters()} 
+        <View style={styles.list}>
+          {[1, 2, 3, 4, 5, 6].map((key) => (
+            <SkeletonCard key={key} />
+          ))}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // 2. Main List
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {renderFilters()}
+
       <FlatList
-        data={MOCK_VIOLATIONS}
+        data={violations}
         renderItem={({ item }) => (
           <ViolationItem 
             item={item} 
-            onPress={() => handleItemPress(item)} 
+            onPress={() => navigation.navigate('ViolationDetail', { violation: item })} 
           />
         )}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item._id}
         style={styles.list}
-        // Add some padding at the top of the list
-        ListHeaderComponent={<View style={{ height: 16 }} />} 
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={
+          <View style={styles.loaderContainer}>
+            <Text style={styles.loadingText}>No violations found.</Text>
+          </View>
+        }
       />
     </SafeAreaView>
   );
-
-  // 13. Conditional rendering: show loader or list
-  return isLoading ? renderLoader() : renderList();
 };
 
 export default ViolationsHistoryScreen;

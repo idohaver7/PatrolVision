@@ -7,48 +7,85 @@ const Violation = require('./models/Violation');
 // 1. Load env vars
 dotenv.config();
 
-// 2. Sample Data
+// 2. Sample Data (Matching your Schema exactly)
 const violationsData = [
+  // --- Tel Aviv ---
   {
     violationType: 'Red Light Violation',
-    licensePlate: '123-45-678',
-    mediaUrl: 'https://picsum.photos/id/237/200/300', // Fake image
-    location: { type: 'Point', coordinates: [34.7818, 32.0853] }, // Tel Aviv (Dizengoff)
+    licensePlate: '12-345-67',
+    mediaUrl: 'https://picsum.photos/id/237/400/600',
+    address: 'Dizengoff St 50, Tel Aviv-Yafo',
+    location: { 
+        type: 'Point', 
+        coordinates: [34.7750, 32.0750] // [Longitude, Latitude]
+    },
     status: 'Pending Review',
-    daysAgo: 0 // Today
+    daysAgo: 0
   },
-  {
-    violationType: 'Illegal Parking', // Note: This assumes 'Other' or allowed enum
-    violationType: 'Wrong Way Driving',
-    licensePlate: '555-11-999',
-    mediaUrl: 'https://picsum.photos/id/238/200/300',
-    location: { type: 'Point', coordinates: [34.8000, 32.0800] }, // Ramat Gan
-    status: 'Verified',
-    daysAgo: 2 // 2 days ago
-  },
+  // --- Highway (Route 2) ---
   {
     violationType: 'Illegal Overtaking',
-    licensePlate: '777-88-222',
-    mediaUrl: 'https://picsum.photos/id/239/200/300',
-    location: { type: 'Point', coordinates: [34.7700, 32.0700] }, // South Tel Aviv
-    status: 'Pending Review',
-    daysAgo: 5 // 5 days ago
+    licensePlate: '77-88-222',
+    mediaUrl: 'https://picsum.photos/id/1/400/600',
+    address: 'Kvish 2, Hof HaSharon',
+    location: { 
+        type: 'Point', 
+        coordinates: [34.8400, 32.3000] 
+    },
+    status: 'Verified',
+    daysAgo: 2
   },
+  // --- Highway (Route 6) ---
+  {
+    violationType: 'Wrong Way Driving',
+    licensePlate: '90-123-45',
+    mediaUrl: 'https://picsum.photos/id/10/400/600',
+    address: 'Kvish 6, Mateh Yehuda',
+    location: { 
+        type: 'Point', 
+        coordinates: [34.9600, 31.8400] 
+    },
+    status: 'Disputed', // Matches your enum
+    daysAgo: 5
+  },
+  // --- Haifa ---
+  {
+    violationType: 'Illegal Turn',
+    licensePlate: '55-999-11',
+    mediaUrl: 'https://picsum.photos/id/20/400/600',
+    address: 'HaNassi Blvd 100, Haifa',
+    location: { 
+        type: 'Point', 
+        coordinates: [35.0200, 32.7700] 
+    },
+    status: 'Pending Review',
+    daysAgo: 1
+  },
+  // --- Be'er Sheva ---
   {
     violationType: 'Red Light Violation',
-    licensePlate: '123-45-678', // Same car as first one (repeat offender!)
-    mediaUrl: 'https://picsum.photos/id/240/200/300',
-    location: { type: 'Point', coordinates: [34.7820, 32.0855] }, // Tel Aviv
+    licensePlate: '33-222-11',
+    mediaUrl: 'https://picsum.photos/id/30/400/600',
+    address: 'Rager Blvd 20, Be\'er Sheva',
+    location: { 
+        type: 'Point', 
+        coordinates: [34.7915, 31.2518] 
+    },
     status: 'Closed',
     daysAgo: 10
   },
+  // --- Jerusalem ---
   {
-    violationType: 'Illegal Turn',
-    licensePlate: '999-00-111',
-    mediaUrl: 'https://picsum.photos/id/241/200/300',
-    location: { type: 'Point', coordinates: [32.7940, 34.9896] }, // Haifa (Far away)
-    status: 'Pending Review',
-    daysAgo: 1
+    violationType: 'Other',
+    licensePlate: '11-111-11',
+    mediaUrl: 'https://picsum.photos/id/40/400/600',
+    address: 'Jaffa St 20, Jerusalem',
+    location: { 
+        type: 'Point', 
+        coordinates: [35.2160, 31.7760] 
+    },
+    status: 'Verified',
+    daysAgo: 3
   }
 ];
 
@@ -58,40 +95,43 @@ const importData = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('✅ MongoDB Connected...');
 
-    // A. Find a user to assign violations to
-    // We'll grab the first user in the DB.
-    const user = await User.findOne();
+    // A. Fetch ALL users
+    const users = await User.find();
 
-    if (!user) {
-      console.error('❌ No users found! Please register a user first via Postman.');
+    if (users.length === 0) {
+      console.error('❌ Error: No users found. Please register users first via App or Postman.');
       process.exit(1);
     }
 
-    console.log(`👤 Assigning violations to user: ${user.firstName} ${user.lastName}`);
+    console.log(`👥 Found ${users.length} users. Distributing violations...`);
 
-    // B. Prepare the data (add user ID and fix dates)
-    const sampleViolations = violationsData.map((v) => {
+    // B. Clear old violations (To start fresh)
+    await Violation.deleteMany(); 
+    console.log('🗑️ Old violations cleared.');
+
+    // C. Distribute violations among users (Round Robin)
+    const sampleViolations = violationsData.map((v, index) => {
+      // Rotate between users: User1 -> User2 -> User1...
+      const assignedUser = users[index % users.length];
+
       const date = new Date();
-      date.setDate(date.getDate() - v.daysAgo); // Set exact date based on "daysAgo"
+      date.setDate(date.getDate() - v.daysAgo);
+      date.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60)); // Random time
       
       return {
         ...v,
-        user: user._id,
+        user: assignedUser._id,
         timestamp: date
       };
     });
 
-    // C. Delete old violations (Optional - un-comment if you want a clean slate)
-    // await Violation.deleteMany(); 
-    // console.log('🗑️ Existing violations cleared.');
-
-    // D. Insert new ones
+    // D. Insert
     await Violation.insertMany(sampleViolations);
-    console.log('🌱 Violations Imported Successfully!');
+    console.log('🌱 Sample Violations Imported Successfully!');
 
     process.exit();
   } catch (err) {
-    console.error(err);
+    console.error('❌ Import Failed:', err);
     process.exit(1);
   }
 };

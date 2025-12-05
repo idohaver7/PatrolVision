@@ -1,5 +1,11 @@
 
 const Violation = require('../models/Violation');
+const NodeGeocoder = require('node-geocoder');
+
+
+const geocoder = NodeGeocoder({
+  provider: 'openstreetmap',
+});
 
 // @desc    Create a new violation report
 // @route   POST /api/violations
@@ -28,6 +34,40 @@ exports.reportViolation = async (req, res) => {
       type: 'Point',
       coordinates: [Number(longitude), Number(latitude)] 
     };
+    // Reverse Geocode to get Address
+    let adress = 'Location not available';
+    try {
+      const res = await geocoder.reverse({ lat: latitude, lon: longitude });
+      
+      if (res && res.length > 0) {
+        const data = res[0];
+        
+        // Option A: Urban Address (Street + Number + City)
+        if (data.streetName && data.streetNumber) {
+          address = `${data.streetName} ${data.streetNumber}, ${data.city || ''}`;
+        }
+        // Option B: Highway / Road (Just Street Name + City/District)
+        // On highways, 'streetName' usually holds values like "Kvish 6" or "Ayalon"
+        else if (data.streetName) {
+          address = `${data.streetName}, ${data.city || data.state || ''}`;
+        }
+        // Option C: Fallback to the full formatted string provided by API
+        else if (data.formattedAddress) {
+          address = data.formattedAddress;
+        }
+        // Option D: Just City
+        else {
+          address = data.city || 'Unknown Road';
+        }
+        
+        // Cleanup: Remove trailing commas or extra spaces
+        address = address.replace(/,\s*$/, '').trim();
+      }
+    } catch (err) {
+      console.error('Geocoder Error:', err.message);
+      // Fallback: If geocoding fails, we will just show coordinates in the app
+      address = `${latitude}, ${longitude}`; 
+    }
 
     // 5. Create the record in the database
     const violation = await Violation.create({
@@ -36,6 +76,7 @@ exports.reportViolation = async (req, res) => {
       licensePlate,
       mediaUrl,
       location,
+      adress,
       status: 'Pending Review'
     });
 
@@ -126,7 +167,7 @@ exports.getViolations = async (req, res) => {
     // Optimization: If it's map mode, we might not need ALL fields immediately?
     // For now, let's return everything to keep it simple.
     const violations = await Violation.find(queryObj)
-      .populate('user', 'firstName lastName email')
+      .populate('user', 'firstName lastName email phoneNumber')
       .sort(sortOrder)
       .skip(startIndex)
       .limit(limit);

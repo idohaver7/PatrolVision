@@ -21,6 +21,10 @@ const ViolationSchema = new mongoose.Schema({
         type: String,
         required: [true, 'evidence URL (image/video) is required']
     },
+    address: {
+        type: String,
+        required: false
+    },
     // GeoSpatial Data 
     location: {
         type: {
@@ -34,7 +38,6 @@ const ViolationSchema = new mongoose.Schema({
             required: [true, 'coordinates are required'],
         }
     },
-
     // Optional
     status: {
         type: String,
@@ -53,5 +56,7 @@ const ViolationSchema = new mongoose.Schema({
 //Create a geospatial index to enable fast queries
 ViolationSchema.index({ location: '2dsphere' });
 
+ViolationSchema.index({ timestamp: -1 });
+ViolationSchema.index({ user: 1 });
 
 module.exports = mongoose.model('Violation', ViolationSchema);
