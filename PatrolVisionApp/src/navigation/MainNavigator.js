@@ -7,6 +7,7 @@ import HomeScreen from '../screens/HomeScreen';
 import ViolationsHistoryScreen from '../screens/ViolationsHistoryScreen';
 import ViolationDetailScreen from '../screens/ViolationDetailScreen';
 import LiveCameraScreen from '../screens/LiveCameraScreen';
+import NewViolationScreen from '../screens/NewViolationScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -40,7 +41,11 @@ const MainNavigator = () => {
         options={{ headerShown: false }}
       />
 
-      {/* These screens remain the same */}
+      <Stack.Screen 
+        name="NewViolation"
+        component={NewViolationScreen}
+        options={{ title: 'Confirm Report', headerShown: false }}
+      />
       <Stack.Screen 
         name="ViolationsHistory"
         component={ViolationsHistoryScreen}

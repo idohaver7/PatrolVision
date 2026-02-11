@@ -40,6 +40,8 @@ const getViolationStyle = (type) => {
       return { icon: 'local-parking', color: '#1976D2', bg: '#EBF8FF' };
     case 'Illegal Turn':
       return { icon: 'alt-route', color: '#A142F4', bg: '#F3E5F5' };
+    case 'Public Lane Violation':
+      return { icon: 'directions-car', color: '#0F9D58', bg: '#E6F4EA' };  
     default:
       return { icon: 'error-outline', color: '#5F6368', bg: '#F1F3F4' };
   }

@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 router.route('/')
-    .post(protect, upload.single('mediaFile'), reportViolation)
+    .post(protect, upload.single('image'), reportViolation)
     .get(protect, getViolations);
 router.get('/analytics', protect, admin, getAnalytics);
 router.route('/:id')
