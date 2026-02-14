@@ -5,6 +5,7 @@ const NodeGeocoder = require('node-geocoder');
 
 const geocoder = NodeGeocoder({
   provider: 'openstreetmap',
+  language: 'en',
 });
 
 // @desc    Create a new violation report
@@ -35,7 +36,7 @@ exports.reportViolation = async (req, res) => {
       coordinates: [Number(longitude), Number(latitude)] 
     };
     // Reverse Geocode to get Address
-    let adress = 'Location not available';
+    let address = 'Location not available';
     try {
       const res = await geocoder.reverse({ lat: latitude, lon: longitude });
       
@@ -76,7 +77,7 @@ exports.reportViolation = async (req, res) => {
       licensePlate,
       mediaUrl,
       location,
-      adress,
+      address,
       status: 'Pending Review'
     });
 

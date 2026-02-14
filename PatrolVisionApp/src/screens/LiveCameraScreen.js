@@ -1,15 +1,84 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, ActivityIndicator, Linking, Button, TouchableOpacity, StatusBar } from 'react-native';
+import {
+  View,
+  Text,
+  ActivityIndicator,
+  StatusBar,
+  Animated,
+  PanResponder,
+  Dimensions,
+  PermissionsAndroid,
+  Platform,
+  Alert,
+  AppState // חשוב: הוספנו את AppState כדי לפתור את הקריסה
+} from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import ImageResizer from "@bam.tech/react-native-image-resizer"; 
+// import ImageResizer from "@bam.tech/react-native-image-resizer"; // אם לא בשימוש כרגע, עדיף להשאיר בהערה
 import Geolocation from 'react-native-geolocation-service';
 
 import { analyzeTrafficFrame } from '../services/api';
 import styles from './LiveCameraScreen.styles';
 import { COLORS } from '../theme/colors';
 
+// --- רכיב סליידר לסיום נסיעה ---
+const SwipeButton = ({ onSwipeSuccess }) => {
+  const [dragX] = useState(new Animated.Value(0));
+  const sliderWidth = Dimensions.get('window').width * 0.85;
+  const thumbSize = 50;
+  const maxDrag = sliderWidth - thumbSize - 10;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx > 0 && gestureState.dx <= maxDrag) {
+          dragX.setValue(gestureState.dx);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > maxDrag * 0.8) {
+          Animated.timing(dragX, {
+            toValue: maxDrag,
+            duration: 200,
+            useNativeDriver: false,
+          }).start(() => onSwipeSuccess());
+        } else {
+          Animated.spring(dragX, {
+            toValue: 0,
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const textOpacity = dragX.interpolate({
+    inputRange: [0, maxDrag / 2],
+    outputRange: [1, 0],
+    extrapolate: 'clamp'
+  });
+
+  return (
+    <View style={[styles.sliderContainer, { width: sliderWidth }]}>
+      <Animated.Text style={[styles.sliderText, { opacity: textOpacity }]}>
+        Slide to End Trip
+      </Animated.Text>
+      <Animated.View
+        style={[
+          styles.sliderThumb,
+          { transform: [{ translateX: dragX }] }
+        ]}
+        {...panResponder.panHandlers}
+      >
+        <Icon name="chevron-right" size={30} color="#000" />
+      </Animated.View>
+    </View>
+  );
+};
+
+// --- המסך הראשי ---
 const LiveCameraScreen = ({ navigation }) => {
   const { hasPermission, requestPermission } = useCameraPermission();
   const [isCheckingPermission, setIsCheckingPermission] = useState(true);
@@ -18,94 +87,159 @@ const LiveCameraScreen = ({ navigation }) => {
 
   const cameraRef = useRef(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const lastProcessTime = useRef(0); 
+  const lastProcessTime = useRef(0);
 
+  // נתוני מיקום ו-GPS
   const [currentLocation, setCurrentLocation] = useState(null);
+  const locationRef = useRef(null);
+  const [gpsStatus, setGpsStatus] = useState('searching'); // 'searching' | 'locked' | 'denied'
+  const [speed, setSpeed] = useState(0); 
 
-  // check and request camera permission on mount
+  // אנימציית REC
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    const checkPermission = async () => {
-      setIsCheckingPermission(true);
-      await requestPermission();
-      // Also request location permission
-      await requestLocationPermission();
-      setIsCheckingPermission(false);
-    };
-    checkPermission();
-  }, [requestPermission]);
+    // 1. התחלת אנימציית הבהוב
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(fadeAnim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true })
+      ])
+    ).start();
 
-  // Request location permission
-  const requestLocationPermission = async () => {
+    // 2. פונקציית אתחול הרשאות (ממתינה שהאפליקציה תהיה במצב פעיל)
+    const initPermissions = async () => {
+      // אם כבר יש הרשאה, רק נוודא שהמיקום עובד
+      if (hasPermission) {
+        setIsCheckingPermission(false);
+        checkLocationPermission();
+        return;
+      }
+
+      try {
+        setIsCheckingPermission(true);
+        const status = await requestPermission();
+        
+        // בדיקה גמישה לסטטוס (כי לפעמים זה סטרינג ולפעמים בוליאני)
+        if (status === 'authorized' || status === 'granted' || status === true) {
+          await checkLocationPermission();
+        }
+      } catch (err) {
+        console.warn('Permission Error:', err);
+      } finally {
+        setIsCheckingPermission(false);
+      }
+    };
+
+    // 3. האזנה לשינויי מצב אפליקציה כדי למנוע קריסת NO_ACTIVITY
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        initPermissions();
+      }
+    });
+
+    // בדיקה ראשונית אם כבר פעיל
+    if (AppState.currentState === 'active') {
+      initPermissions();
+    }
+
+    // ניקוי ביציאה
+    return () => {
+      subscription.remove();
+      Geolocation.stopObserving();
+    };
+  }, []); // תלות ריקה כדי שירוץ פעם אחת בטעינה
+
+  // --- פונקציות עזר למיקום ---
+  const checkLocationPermission = async () => {
     if (Platform.OS === 'android') {
       try {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
         );
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          // Permission granted
           startLocationTracking();
+        } else {
+          setGpsStatus('denied');
+          // אופציונלי: התראה למשתמש
+          // Alert.alert("שגיאה", "נדרשת גישה למיקום");
         }
       } catch (err) {
         console.warn(err);
       }
+    } else {
+      startLocationTracking();
     }
   };
-  // Start tracking location
+
   const startLocationTracking = () => {
+    setGpsStatus('searching');
     Geolocation.watchPosition(
       (position) => {
-        // Update current location state
-        setCurrentLocation({
+        setGpsStatus('locked');
+        const newLoc = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-        });
+          accuracy: position.coords.accuracy
+        };
+        setCurrentLocation({newLoc});
+        locationRef.current = newLoc;
+
+        if (position.coords.speed && position.coords.speed > 0) {
+          setSpeed(Math.round(position.coords.speed * 3.6));
+        } else {
+          setSpeed(0);
+        }
       },
       (error) => {
         console.log("GPS Error:", error.code, error.message);
+        setGpsStatus('searching');
       },
-      { enableHighAccuracy: true, distanceFilter: 10, interval: 5000 }
+      {
+        enableHighAccuracy: true,
+        distanceFilter: 5,
+        interval: 3000,
+        fastestInterval: 2000
+      }
     );
   };
 
-//global function to process frames periodically
+  // --- עיבוד תמונה ---
   const processFrame = async () => {
-    // Rate limiting: process only if not already processing and at least 1 second since last
     const now = Date.now();
+    // Rate limiting: בדיקה כל שניה
     if (!cameraRef.current || isProcessing || (now - lastProcessTime.current < 1000)) return;
 
     try {
       setIsProcessing(true);
       lastProcessTime.current = now;
 
-      // 1. Capture photo from camera
+      // צילום תמונה מהירה
       const photo = await cameraRef.current.takePhoto({
         qualityPrioritization: 'speed',
         flash: 'off'
       });
 
-      // 2. Resize the image to reduce upload size
-      // const resized = await ImageResizer.createResizedImage(
-      //   photo.path,
-      //   1280, 720, 'JPEG', 70, 0
-      // );
-      const resized = { uri: 'file://' + photo.path }; // Skip resizing for now
+      // כרגע מדלגים על כיווץ (אפשר להחזיר בהמשך)
+      const resized = { uri: 'file://' + photo.path }; 
 
-      // 3. Send to server for analysis
+      // שליחה לשרת
       const result = await analyzeTrafficFrame(resized.uri);
 
-      // 4. If violation detected, navigate to NewViolationScreen
+      // זיהוי עבירה
       if (result.success && result.data.violation_detected) {
         console.log("🚨 VIOLATION FOUND:", result.data.type);
-        
-        // Navigate to NewViolationScreen with details
+        const locationToSend = locationRef.current || { latitude: 0, longitude: 0 };
+        console.log("📍 Sending Location:", locationToSend);
+
         navigation.navigate('NewViolation', {
           violationType: result.data.type,
-          plate: result.data.details?.plate, // catch plate if available
-          imageUri: 'file://' + photo.path, // send original image path
-          location: currentLocation || { latitude: 0, longitude: 0 } // use current location or fallback
+          plate: result.data.details?.plate,
+          imageUri: 'file://' + photo.path,
+          // שליחת המיקום האחרון שנשמר
+          location: locationToSend || { latitude: 0, longitude: 0 } 
         });
       }
-
     } catch (err) {
       console.log("Processing Error:", err);
     } finally {
@@ -113,45 +247,82 @@ const LiveCameraScreen = ({ navigation }) => {
     }
   };
 
-  // Set up interval to process frames every second
+  // טיימר לעיבוד תמונות
   useEffect(() => {
     const interval = setInterval(() => {
-       // Call the frame 
-       processFrame();
-    }, 1000); 
+      processFrame();
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [isProcessing]); 
+  }, [isProcessing, currentLocation]); // תלויות מעודכנות
 
- 
-  if (isCheckingPermission) return <ActivityIndicator size="large" />;
-  if (!hasPermission) return <Text>No Permission</Text>;
-  if (device == null) return <Text>No Device</Text>;
+  // --- יציאה מהמסך ---
+  const handleEndTrip = () => {
+    Geolocation.stopObserving();
+    navigation.goBack();
+  };
+
+  // צבע לאייקון ה-GPS
+  const getGpsIconColor = () => {
+    if (gpsStatus === 'locked') return '#4CAF50';
+    if (gpsStatus === 'denied') return '#F44336';
+    return '#FFC107';
+  };
+
+  // --- UI ---
+  // מסך טעינה יפה יותר במקום סתם ספינר
+  if (isCheckingPermission) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#FFF" />
+        <Text style={{ color: 'white', marginTop: 10 }}>Checking Permissions...</Text>
+      </View>
+    );
+  }
+  
+  if (!hasPermission) return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{color: 'white'}}>No Camera Permission</Text>
+      </View>
+  );
+  
+  if (device == null) return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{color: 'white'}}>No Camera Device Found</Text>
+      </View>
+  );
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      
+
       <Camera
-        ref={cameraRef} 
+        ref={cameraRef}
         style={styles.camera}
         device={device}
-        isActive={true} // allways active when on this screen
-        photo={true}    // enable photo capture
+        isActive={true}
+        photo={true}
       />
 
-      {/* Overlay UI */}
-      <View style={{position: 'absolute', top: 60, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 5, borderRadius: 5}}>
-          <Text style={{color: 'white', fontSize: 12}}>
-            {isProcessing ? "Analyzing..." : "Scanning for violations"}
-          </Text>
+      {/* --- Top Bar --- */}
+      <View style={[styles.topBar, { top: insets.top + 10 }]}>
+        {/* מחוון הקלטה */}
+        <View style={styles.recContainer}>
+          <Animated.View style={[styles.recDot, { opacity: fadeAnim }]} />
+          <Text style={styles.recText}>REC</Text>
+        </View>
+
+        {/* מחוון GPS ומהירות */}
+        <View style={styles.gpsContainer}>
+          <Text style={styles.speedText}>{speed} km/h</Text>
+          <Icon name="gps-fixed" size={20} color={getGpsIconColor()} style={{ marginLeft: 8 }} />
+        </View>
       </View>
 
-      <View style={styles.overlayContainer}>
-        <TouchableOpacity style={[styles.closeButton, { top: insets.top + 10 }]} onPress={() => navigation.goBack()}>
-          <Icon name="close" size={24} color={COLORS.surface} />
-        </TouchableOpacity>
-      </View>  
+      {/* --- Bottom Slider --- */}
+      <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
+        <SwipeButton onSwipeSuccess={handleEndTrip} />
+      </View>
     </View>
   );
 };

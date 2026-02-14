@@ -1,12 +1,62 @@
 import { StyleSheet } from 'react-native';
-import { COLORS } from '../theme/colors';
+
 export default StyleSheet.create({
-     container: { flexGrow: 1, padding: 20, backgroundColor: COLORS.surface || '#fff' },
-  title: { fontSize: 24, fontWeight: 'bold', color: 'red', textAlign: 'center', marginBottom: 20 },
-  image: { width: '100%', height: 250, borderRadius: 10, marginBottom: 20 },
-  form: { gap: 10 },
-  label: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  value: { fontSize: 18, marginBottom: 10, color: '#555' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, fontSize: 18, marginBottom: 20 },
-  buttons: { marginTop: 10 }
+  container: {
+    flex: 1,
+    backgroundColor: '#121212', 
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  imageContainer: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 25,
+    borderWidth: 1,
+    borderColor: '#333',
+    backgroundColor: '#000',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  detailsContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  violationType: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  plateNumber: {
+    fontSize: 18,
+    color: '#B0B0B0', 
+    marginBottom: 15,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  locationText: {
+    fontSize: 16,
+    color: '#E0E0E0',
+    marginLeft: 5,
+  },
+  timestamp: {
+    fontSize: 14,
+    color: '#888888', 
+    marginTop: 5,
+  }
 });

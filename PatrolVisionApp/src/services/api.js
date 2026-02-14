@@ -2,8 +2,8 @@
 import axios from 'axios';
 
 // ⚠️ IMPORTANT: Ensure this IP matches your computer's IP via 'ipconfig'
-const BASE_URL = 'http://192.168.1.36:5000/api'; 
-const FLASK_URL = 'http://192.168.1.36:6000/analyze';
+const BASE_URL = 'http://192.168.1.35:5000/api'; 
+const FLASK_URL = 'http://192.168.1.35:6000/analyze';
 
 const api = axios.create({
   baseURL: BASE_URL,

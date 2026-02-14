@@ -24,8 +24,7 @@ const FILTER_TYPES = [
   { id: 'all', label: 'All' },
   { id: 'Red Light Violation', label: 'Red Light' },
   { id: 'Illegal Overtaking', label: 'Overtaking' },
-  { id: 'Wrong Way Driving', label: 'Wrong Way' },
-  { id: 'Illegal Parking', label: 'Parking' },
+  { id: 'Public Lane Violation', label: 'Public Lane' },
 ];
 
 const getViolationStyle = (type) => {
@@ -34,14 +33,8 @@ const getViolationStyle = (type) => {
       return { icon: 'traffic', color: '#D93025', bg: '#FCE8E6' };
     case 'Illegal Overtaking':
       return { icon: 'compare-arrows', color: '#F9AB00', bg: '#FEF7E0' };
-    case 'Wrong Way Driving':
-      return { icon: 'block', color: '#C5221F', bg: '#FCE8E6' };
-    case 'Illegal Parking':
-      return { icon: 'local-parking', color: '#1976D2', bg: '#EBF8FF' };
-    case 'Illegal Turn':
-      return { icon: 'alt-route', color: '#A142F4', bg: '#F3E5F5' };
     case 'Public Lane Violation':
-      return { icon: 'directions-car', color: '#0F9D58', bg: '#E6F4EA' };  
+      return { icon: 'directions-bus', color: '#0F9D58', bg: '#E6F4EA' };  
     default:
       return { icon: 'error-outline', color: '#5F6368', bg: '#F1F3F4' };
   }
