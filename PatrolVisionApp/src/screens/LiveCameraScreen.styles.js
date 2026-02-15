@@ -38,7 +38,7 @@ export default StyleSheet.create({
     left: 20,
     right: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between', // זה מפזר את ה-REC לשמאל ואת ה-GPS לימין
+    justifyContent: 'space-between', 
     alignItems: 'center',
     zIndex: 10,
   },
@@ -66,7 +66,7 @@ export default StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // GPS & Speed Indicator (חדש)
+  // GPS & Speed Indicator 
   gpsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -80,7 +80,7 @@ export default StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
     marginRight: 5,
-    fontVariant: ['tabular-nums'], // מונע קפיצות של הטקסט כשהמספרים משתנים
+    fontVariant: ['tabular-nums'], 
   },
 
   // --- Bottom Slider Area ---

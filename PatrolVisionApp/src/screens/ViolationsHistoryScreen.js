@@ -239,7 +239,7 @@ const ViolationsHistoryScreen = ({ navigation }) => {
 
   // --- Main Render Logic ---
 
-  // 1. If Loading (Initial Load) -> Show Skeleton
+  //  If Loading (Initial Load) -> Show Skeleton
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>

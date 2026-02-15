@@ -24,7 +24,7 @@ const MainNavigator = () => {
           fontWeight: 'bold',
         },
       }}
-      // 2. Set the *initial* route to be our new HomeScreen
+      //  Set the *initial* route to be our new HomeScreen
       initialRouteName="Home"
     >
       
@@ -32,7 +32,7 @@ const MainNavigator = () => {
       <Stack.Screen 
         name="Home"
         component={HomeScreen}
-        // 4. We hide the header for the main home screen
+        //  We hide the header for the main home screen
         options={{ headerShown: false }} 
       />
       <Stack.Screen 

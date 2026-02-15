@@ -10,19 +10,19 @@ import {
   PermissionsAndroid,
   Platform,
   Alert,
-  AppState // חשוב: הוספנו את AppState כדי לפתור את הקריסה
+  AppState 
 } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-// import ImageResizer from "@bam.tech/react-native-image-resizer"; // אם לא בשימוש כרגע, עדיף להשאיר בהערה
+// import ImageResizer from "@bam.tech/react-native-image-resizer";  
 import Geolocation from 'react-native-geolocation-service';
 
 import { analyzeTrafficFrame } from '../services/api';
 import styles from './LiveCameraScreen.styles';
 import { COLORS } from '../theme/colors';
 
-// --- רכיב סליידר לסיום נסיעה ---
+//swipe button component
 const SwipeButton = ({ onSwipeSuccess }) => {
   const [dragX] = useState(new Animated.Value(0));
   const sliderWidth = Dimensions.get('window').width * 0.85;
@@ -78,7 +78,7 @@ const SwipeButton = ({ onSwipeSuccess }) => {
   );
 };
 
-// --- המסך הראשי ---
+
 const LiveCameraScreen = ({ navigation }) => {
   const { hasPermission, requestPermission } = useCameraPermission();
   const [isCheckingPermission, setIsCheckingPermission] = useState(true);
@@ -89,17 +89,17 @@ const LiveCameraScreen = ({ navigation }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const lastProcessTime = useRef(0);
 
-  // נתוני מיקום ו-GPS
+  // GPS State
   const [currentLocation, setCurrentLocation] = useState(null);
   const locationRef = useRef(null);
   const [gpsStatus, setGpsStatus] = useState('searching'); // 'searching' | 'locked' | 'denied'
   const [speed, setSpeed] = useState(0); 
 
-  // אנימציית REC
+  // Rec animation
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // 1. התחלת אנימציית הבהוב
+    // Start the blinking animation for the REC indicator
     Animated.loop(
       Animated.sequence([
         Animated.timing(fadeAnim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
@@ -107,9 +107,8 @@ const LiveCameraScreen = ({ navigation }) => {
       ])
     ).start();
 
-    // 2. פונקציית אתחול הרשאות (ממתינה שהאפליקציה תהיה במצב פעיל)
+    // 2. Init permissions and GPS tracking
     const initPermissions = async () => {
-      // אם כבר יש הרשאה, רק נוודא שהמיקום עובד
       if (hasPermission) {
         setIsCheckingPermission(false);
         checkLocationPermission();
@@ -120,7 +119,6 @@ const LiveCameraScreen = ({ navigation }) => {
         setIsCheckingPermission(true);
         const status = await requestPermission();
         
-        // בדיקה גמישה לסטטוס (כי לפעמים זה סטרינג ולפעמים בוליאני)
         if (status === 'authorized' || status === 'granted' || status === true) {
           await checkLocationPermission();
         }
@@ -131,26 +129,26 @@ const LiveCameraScreen = ({ navigation }) => {
       }
     };
 
-    // 3. האזנה לשינויי מצב אפליקציה כדי למנוע קריסת NO_ACTIVITY
+    // Check permissions on app focus (in case user goes to settings and comes back)
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
         initPermissions();
       }
     });
 
-    // בדיקה ראשונית אם כבר פעיל
+    // initial check on mount
     if (AppState.currentState === 'active') {
       initPermissions();
     }
 
-    // ניקוי ביציאה
+    // cleanup on unmount
     return () => {
       subscription.remove();
       Geolocation.stopObserving();
     };
-  }, []); // תלות ריקה כדי שירוץ פעם אחת בטעינה
+  }, []); 
 
-  // --- פונקציות עזר למיקום ---
+  // --- GPS Permission & Tracking ---
   const checkLocationPermission = async () => {
     if (Platform.OS === 'android') {
       try {
@@ -161,8 +159,6 @@ const LiveCameraScreen = ({ navigation }) => {
           startLocationTracking();
         } else {
           setGpsStatus('denied');
-          // אופציונלי: התראה למשתמש
-          // Alert.alert("שגיאה", "נדרשת גישה למיקום");
         }
       } catch (err) {
         console.warn(err);
@@ -204,29 +200,38 @@ const LiveCameraScreen = ({ navigation }) => {
     );
   };
 
-  // --- עיבוד תמונה ---
+  // process frame function with rate limiting
   const processFrame = async () => {
     const now = Date.now();
-    // Rate limiting: בדיקה כל שניה
+    // Rate limiting: check if we're already processing or if the last process was less than 1 second ago
     if (!cameraRef.current || isProcessing || (now - lastProcessTime.current < 1000)) return;
 
     try {
       setIsProcessing(true);
       lastProcessTime.current = now;
 
-      // צילום תמונה מהירה
+      // take photo with low quality for faster processing
       const photo = await cameraRef.current.takePhoto({
-        qualityPrioritization: 'speed',
+        qualityPrioritization: 'balanced',
         flash: 'off'
       });
 
-      // כרגע מדלגים על כיווץ (אפשר להחזיר בהמשך)
-      const resized = { uri: 'file://' + photo.path }; 
+      // resize the image to reduce file size before sending to Flask
+      // const resized = await ImageResizer.createResizedImage(
+      //   photo.path,
+      //   1920, 
+      //   1080, 
+      //   'JPEG',
+      //   80,   
+      //   0     
+      // ); 
+      const uploadUri = 'file://' + photo.path;
 
-      // שליחה לשרת
-      const result = await analyzeTrafficFrame(resized.uri);
+      // send to Flask for analysis
+      const result = await analyzeTrafficFrame(uploadUri);
+      
 
-      // זיהוי עבירה
+      // if violation detected, navigate to NewViolation screen with details
       if (result.success && result.data.violation_detected) {
         console.log("🚨 VIOLATION FOUND:", result.data.type);
         const locationToSend = locationRef.current || { latitude: 0, longitude: 0 };
@@ -236,7 +241,7 @@ const LiveCameraScreen = ({ navigation }) => {
           violationType: result.data.type,
           plate: result.data.details?.plate,
           imageUri: 'file://' + photo.path,
-          // שליחת המיקום האחרון שנשמר
+          // sending the most recent location we have, or a default if we don't have one yet. The server can handle missing/zero coordinates if needed.
           location: locationToSend || { latitude: 0, longitude: 0 } 
         });
       }
@@ -247,22 +252,22 @@ const LiveCameraScreen = ({ navigation }) => {
     }
   };
 
-  // טיימר לעיבוד תמונות
+  // take a frame every second and process it
   useEffect(() => {
     const interval = setInterval(() => {
       processFrame();
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isProcessing, currentLocation]); // תלויות מעודכנות
+  }, [isProcessing, currentLocation]); 
 
-  // --- יציאה מהמסך ---
+  // handle end trip - stop GPS tracking and go back
   const handleEndTrip = () => {
     Geolocation.stopObserving();
     navigation.goBack();
   };
 
-  // צבע לאייקון ה-GPS
+  // gps icon color based on status
   const getGpsIconColor = () => {
     if (gpsStatus === 'locked') return '#4CAF50';
     if (gpsStatus === 'denied') return '#F44336';
@@ -270,7 +275,6 @@ const LiveCameraScreen = ({ navigation }) => {
   };
 
   // --- UI ---
-  // מסך טעינה יפה יותר במקום סתם ספינר
   if (isCheckingPermission) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -306,20 +310,20 @@ const LiveCameraScreen = ({ navigation }) => {
 
       {/* --- Top Bar --- */}
       <View style={[styles.topBar, { top: insets.top + 10 }]}>
-        {/* מחוון הקלטה */}
+        {/* Record */}
         <View style={styles.recContainer}>
           <Animated.View style={[styles.recDot, { opacity: fadeAnim }]} />
           <Text style={styles.recText}>REC</Text>
         </View>
 
-        {/* מחוון GPS ומהירות */}
+        {/* GPS*/}
         <View style={styles.gpsContainer}>
           <Text style={styles.speedText}>{speed} km/h</Text>
           <Icon name="gps-fixed" size={20} color={getGpsIconColor()} style={{ marginLeft: 8 }} />
         </View>
       </View>
 
-      {/* --- Bottom Slider --- */}
+      {/*  Bottom Slider */}
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
         <SwipeButton onSwipeSuccess={handleEndTrip} />
       </View>
