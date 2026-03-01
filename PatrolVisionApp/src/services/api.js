@@ -2,8 +2,9 @@
 import axios from 'axios';
 
 // ⚠️ IMPORTANT: Ensure this IP matches your computer's IP via 'ipconfig'
-const BASE_URL = 'http://192.168.1.35:5000/api'; 
-const FLASK_URL = 'http://192.168.1.35:6000/analyze';
+export const SERVER_URL = 'https://cowboy-bookmark-specializing-bacon.trycloudflare.com'; 
+const BASE_URL = 'https://cowboy-bookmark-specializing-bacon.trycloudflare.com/api'; 
+const FLASK_URL = 'https://slyvia-nonpigmented-refractively.ngrok-free.dev/analyze';
 
 const api = axios.create({
   baseURL: BASE_URL,

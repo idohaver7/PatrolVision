@@ -28,7 +28,7 @@ exports.reportViolation = async (req, res) => {
 
     // Construct the media URL
     // Currently points to local server. Will be updated to Cloud Storage URL later.
-    const mediaUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    const mediaUrl = `/uploads/${req.file.filename}`;
 
     // Create Location object (GeoJSON format)
     const location = {

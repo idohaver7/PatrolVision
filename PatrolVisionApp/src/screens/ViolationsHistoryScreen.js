@@ -18,7 +18,7 @@ import SkeletonCard from '../components/SkeletonCard';
 import styles from './ViolationsHistoryScreen.styles';
 import { COLORS } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import { fetchViolations } from '../services/api';
+import { fetchViolations, SERVER_URL } from '../services/api';
 
 const FILTER_TYPES = [
   { id: 'all', label: 'All' },
@@ -100,7 +100,7 @@ const ViolationItem = ({ item, onPress }) => {
         </View>
       </View>
       
-      <Image source={{ uri: item.mediaUrl }} style={styles.thumbnail} resizeMode="cover" />
+      <Image source={{ uri: `${SERVER_URL}${item.mediaUrl}` }} style={styles.thumbnail} resizeMode="cover" />
     </Pressable>
   );
 };
