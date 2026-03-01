@@ -11,6 +11,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import styles from './ViolationDetailScreen.styles';
 import { COLORS } from '../theme/colors';
+import { SERVER_URL } from '../services/api';
 
 const ViolationDetailScreen = ({ route }) => {
   
@@ -44,7 +45,7 @@ const ViolationDetailScreen = ({ route }) => {
         {/*  Header Image */}
         <View style={styles.imageContainer}>
           <Image 
-            source={{ uri: violation.mediaUrl }} 
+            source={{ uri: `${SERVER_URL}/${violation.mediaUrl}` }} 
             style={styles.image} 
             resizeMode="contain" 
             resizeMethod='resize'
