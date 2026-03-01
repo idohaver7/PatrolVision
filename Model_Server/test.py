@@ -4,7 +4,7 @@ import requests
 url = 'http://127.0.0.1:6000/analyze'
 
 # השם של התמונה ששמרת
-image_path = 'first.png'  # שים פה את התמונה שלך
+image_path = '6.png'  # שים פה את התמונה שלך
 
 try:
     print(f"📤 Sending {image_path} to server...")

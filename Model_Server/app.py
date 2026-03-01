@@ -7,6 +7,7 @@ import easyocr
 import re
 import time
 import os
+import math
 
 app = Flask(__name__)
 CORS(app)
@@ -14,7 +15,8 @@ CORS(app)
 # --- CONFIGURATION ---
 LANE_SIDE = 'right'      
 MIN_VEHICLE_AREA = 4000  
-MAX_LANE_DIST = 500      # הערך המעודכן שעובד לך
+MAX_LANE_DIST = 500      
+RED_LIGHT_TOLERANCE = 30
 
 # --- LOAD MODELS ---
 try:
@@ -65,39 +67,19 @@ def calculate_intersection_ratio(box1, box2):
 def is_past_line(vehicle_box, line_box):
     return vehicle_box[3] < line_box[3]
 
+def calculate_distance(p1, p2):
+    return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+
 def is_vehicle_relevant(box, min_area):
     width = box[2] - box[0]
     height = box[3] - box[1]
     return (width * height) > min_area
-
-def find_closest_light_color(vehicle_box, red_lights, green_lights):
-    v_cx, v_cy = get_center(vehicle_box)
-    closest_distance = float('inf')
-    closest_color = None
-    
-    for light in red_lights:
-        l_cx, l_cy = get_center(light)
-        dist = abs(v_cx - l_cx)
-        if dist < closest_distance:
-            closest_distance = dist
-            closest_color = 'red'
-
-    for light in green_lights:
-        l_cx, l_cy = get_center(light)
-        dist = abs(v_cx - l_cx)
-        if dist < closest_distance:
-            closest_distance = dist
-            closest_color = 'green'
-            
-    if closest_distance > 500: return None
-    return closest_color
-
 # --- OCR FUNCTION ---
 def read_license_plate(img, plate_box):
     x1, y1, x2, y2 = map(int, plate_box)
     h, w, _ = img.shape
-    x1, y1 = max(0, x1), max(0, y1)
-    x2, y2 = min(w, x2), min(h, y2)
+    x1, y1 = max(0, x1-5), max(0, y1-5)
+    x2, y2 = min(w, x2+5), min(h, y2+5)
     
     plate_img = img[y1:y2, x1:x2]
     
@@ -106,13 +88,82 @@ def read_license_plate(img, plate_box):
         full_text = "".join(results)
         clean_number = re.sub(r'[^0-9]', '', full_text)
         
-        if 5 <= len(clean_number) <= 8:
+        if 6 <= len(clean_number) <= 8:
             return clean_number
         else:
             return None 
     except Exception:
         return None
 # --- LOGIC ---
+#Red Light Detection Helper
+def find_active_red_lines(stop_lines, red_lights, green_lights):
+    """
+    מחזירה רשימה של קווי עצירה שהרמזור המשויך אליהם הוא אדום.
+    הלוגיקה: משייכים לכל קו את הרמזור הכי קרוב אליו.
+    """
+    active_lines = []
+    
+    for line in stop_lines:
+        l_center = get_center(line)
+        
+        closest_red_dist = float('inf')
+        closest_green_dist = float('inf')
+        
+        # בדיקת מרחק לרמזורים אדומים
+        for red in red_lights:
+            dist = calculate_distance(l_center, get_center(red))
+            if dist < closest_red_dist:
+                closest_red_dist = dist
+                
+        # בדיקת מרחק לרמזורים ירוקים
+        for green in green_lights:
+            dist = calculate_distance(l_center, get_center(green))
+            if dist < closest_green_dist:
+                closest_green_dist = dist
+        
+        # אם אין רמזורים קרובים בכלל (למשל מעל 400 פיקסל), מתעלמים מהקו
+        if min(closest_red_dist, closest_green_dist) > 400:
+            continue
+
+        # אם הרמזור האדום קרוב יותר מהירוק - הקו הזה "חם" (אסור לחצייה)
+        if closest_red_dist < closest_green_dist:
+            active_lines.append(line)
+            
+    return active_lines
+
+def check_red_light_violation(vehicle, active_red_lines):
+    """
+    בודק אם רכב עבר קו עצירה שהוגדר כפעיל (באדום).
+    """
+    vx1, vy1, vx2, vy2 = vehicle
+    v_bottom = vy2  # החלק התחתון של הרכב (גלגלים אחוריים בד"כ בפרספקטיבה רגילה)
+    
+    for line in active_red_lines:
+        lx1, ly1, lx2, ly2 = line
+        
+        # אנו מניחים קו אופקי. ניקח את ה-Y הממוצע שלו
+        l_center_y = (ly1 + ly2) / 2
+        l_min_x, l_max_x = min(lx1, lx2), max(lx1, lx2)
+        v_center_x = (vx1 + vx2) / 2
+
+        # 1. בדיקה אופקית: האם הרכב נמצא בכלל בנתיב של הקו?
+        # נוסיף קצת רחב (Margin) כדי לתפוס רכבים שחצי בחוץ
+        if not (l_min_x - 20 < v_center_x < l_max_x + 20):
+            continue
+
+        # 2. בדיקת חצייה (Perspective Dependent):
+        # הנחה: הרכב נוסע "למעלה" בתמונה (מתרחק), ולכן ה-Y שלו קטן.
+        # אם תחתית הרכב (מספר גבוה) קטנה (נמצאת מעל) ממרכז הקו -> הוא עבר אותו.
+        
+        # חישוב המרחק שהרכב עבר את הקו
+        distance_past_line = l_center_y - v_bottom 
+
+        # אם הרכב עבר את הקו ביותר מ-X פיקסלים (TOLERANCE)
+        if distance_past_line > RED_LIGHT_TOLERANCE:
+            return True, line
+            
+    return False, None
+
 def check_bus_lane_violation(vehicle_box, bus_lines, img_height):
     vx1, vy1, vx2, vy2 = vehicle_box
     v_center_x, v_center_y = get_center(vehicle_box)
@@ -158,16 +209,13 @@ def check_bus_lane_violation(vehicle_box, bus_lines, img_height):
 
 @app.route('/analyze', methods=['POST'])
 def analyze_frame():
-    violation_detected = False
-    violation_type = None
-    details = None
-    
     if 'frame' not in request.files:
         return jsonify({"error": "No frame provided"}), 400
 
     file = request.files['frame']
     np_arr = np.frombuffer(file.read(), np.uint8)
     img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    
     if img is None:
         return jsonify({"error": "Invalid image"}), 400
     print(f"✅ Image received! Size: {img.shape}")
@@ -181,7 +229,7 @@ def analyze_frame():
         "solid_lines": [], "bus_lines": [], "stop_lines": [],
         "red_lights": [], "green_lights": [],
         "taxi_hats": [],
-        "license_plates": [] # הוספנו רשימה ללוחיות
+        "license_plates": [] 
     }
 
     for result in results:
@@ -256,7 +304,7 @@ def analyze_frame():
                 if condition_touching or condition_left_side:
                     
                     violation_detected = True
-                    violation_type = "Illegal Overtaking (Solid Line)"
+                    violation_type = "Illegal Overtaking"
                     plate_num = find_plate_text_for_vehicle(vehicle)
                     violation_data = {"box": vehicle, "plate": plate_num}
                     
@@ -286,21 +334,25 @@ def analyze_frame():
 
     # --- RULE 3: Red Light ---
     if not violation_detected:
-        for vehicle in all_vehicles:
-            for line in detected_objects["stop_lines"]:
-                v_center = get_center(vehicle)
-                is_crossing = is_center_inside(v_center, line) or is_past_line(vehicle, line)
+        # קודם מוצאים אילו קווים הם "אדומים" כרגע
+        active_lines = find_active_red_lines(
+            detected_objects["stop_lines"], 
+            detected_objects["red_lights"], 
+            detected_objects["green_lights"]
+        )
+        
+        if len(active_lines) > 0:
+            for vehicle in all_vehicles:
+                is_violation, line_crossed = check_red_light_violation(vehicle, active_lines)
                 
-                if is_crossing:
-                    relevant_color = find_closest_light_color(vehicle, detected_objects["red_lights"], detected_objects["green_lights"])
-                    if relevant_color == 'red':
-                        violation_detected = True
-                        violation_type = "Red Light Crossing"
-                        plate_num = find_plate_text_for_vehicle(vehicle)
-                        violation_data = {"box": vehicle, "plate": plate_num}
-                        break
-            if violation_detected: break
-
+                if is_violation:
+                    violation_detected = True
+                    violation_type = "Red Light Violation"
+                    plate_num = find_plate_text_for_vehicle(vehicle)
+                    violation_data = {"box": vehicle, "plate": plate_num, "line": line_crossed}
+                    print(f"🚨 VIOLATION: Red Light! Plate: {plate_num}")
+                    break
+                
     if violation_detected:
         plate_str = violation_data.get('plate') if violation_data.get('plate') else "Unknown"
         print(f"⚠️ VIOLATION: {violation_type} | Plate: {plate_str}")
