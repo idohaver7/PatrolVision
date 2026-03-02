@@ -111,6 +111,10 @@ exports.getViolations = async (req, res) => {
     } else {
       queryObj.user = req.user._id;
     }
+    // Status Filter
+    if (req.query.status) {
+      queryObj.status = req.query.status;
+    }
 
     // License Plate
     if (req.query.licensePlate) {
