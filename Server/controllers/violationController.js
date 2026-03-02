@@ -5,6 +5,7 @@ const NodeGeocoder = require('node-geocoder');
 
 const geocoder = NodeGeocoder({
   provider: 'openstreetmap',
+  language: 'en',
 });
 
 // @desc    Create a new violation report
@@ -26,8 +27,8 @@ exports.reportViolation = async (req, res) => {
     }
 
     // Construct the media URL
-    // Currently points to local server. Will be updated to Cloud Storage URL later.
-    const mediaUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    // Currently points to local server.
+    const mediaUrl = `uploads/${req.file.filename}`;
 
     // Create Location object (GeoJSON format)
     const location = {
@@ -35,7 +36,7 @@ exports.reportViolation = async (req, res) => {
       coordinates: [Number(longitude), Number(latitude)] 
     };
     // Reverse Geocode to get Address
-    let adress = 'Location not available';
+    let address = 'Location not available';
     try {
       const res = await geocoder.reverse({ lat: latitude, lon: longitude });
       
@@ -76,7 +77,7 @@ exports.reportViolation = async (req, res) => {
       licensePlate,
       mediaUrl,
       location,
-      adress,
+      address,
       status: 'Pending Review'
     });
 
@@ -98,7 +99,7 @@ exports.getViolations = async (req, res) => {
   try {
     const queryObj = {};
 
-    // --- 1. Check for Map Mode ---
+    // --- Check for Map Mode ---
     // If mode is 'map', we want to fetch MANY items (e.g., 500) to populate the map.
     // If mode is not 'map' (default), we use strict pagination (e.g., 20 items).
     const isMapMode = req.query.mode === 'map';
@@ -176,7 +177,7 @@ exports.getViolations = async (req, res) => {
       .skip(startIndex)
       .limit(limit);
 
-    // --- 5. Pagination Info ---
+    // --- Pagination Info ---
     const pagination = {};
     if (endIndex < total) {
       pagination.next = { page: page + 1, limit };
@@ -281,10 +282,10 @@ exports.deleteViolation = async (req, res) => {
 // @access  Private (Admin Only)
 exports.getAnalytics = async (req, res) => {
   try {
-    // 1. Total Violations Count
+    //  Total Violations Count
     const totalViolations = await Violation.countDocuments();
 
-    // 2. Count by Status (Pending, Verified, etc.)
+    //  Count by Status (Pending, Verified, etc.)
     const statusStats = await Violation.aggregate([
       {
         $group: {
@@ -294,7 +295,7 @@ exports.getAnalytics = async (req, res) => {
       }
     ]);
 
-    // 3. Count by Violation Type
+    //  Count by Violation Type
     const typeStats = await Violation.aggregate([
       {
         $group: {
@@ -305,7 +306,7 @@ exports.getAnalytics = async (req, res) => {
       { $sort: { count: -1 } } // Sort most frequent first
     ]);
 
-    // 4. Recent Activity (Last 5 uploads)
+    //  Recent Activity (Last 5 uploads)
     const recentActivity = await Violation.find()
       .select('violationType createdAt')
       .sort({ createdAt: -1 })

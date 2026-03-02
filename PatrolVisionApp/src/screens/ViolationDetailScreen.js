@@ -11,10 +11,11 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import styles from './ViolationDetailScreen.styles';
 import { COLORS } from '../theme/colors';
+import { SERVER_URL } from '../services/api';
 
 const ViolationDetailScreen = ({ route }) => {
   
-  // 1. Get the data passed directly from the History list
+  //  Get the data passed directly from the History list
   const { violation } = route.params;
 
   // --- Helper Functions ---
@@ -41,16 +42,17 @@ const ViolationDetailScreen = ({ route }) => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
-        {/* 1. Header Image */}
+        {/*  Header Image */}
         <View style={styles.imageContainer}>
           <Image 
-            source={{ uri: violation.mediaUrl }} 
+            source={{ uri: `${SERVER_URL}/${violation.mediaUrl}` }} 
             style={styles.image} 
-            resizeMode="cover" 
+            resizeMode="contain" 
+            resizeMethod='resize'
           />
         </View>
 
-        {/* 2. Details Card (Floating) */}
+        {/*  Details Card (Floating) */}
         <View style={styles.detailsCard}>
           
           {/* Title & Status Badge */}

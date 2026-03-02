@@ -10,7 +10,7 @@ const ViolationSchema = new mongoose.Schema({
     violationType: {
         type: String,
         required: [true, 'violation type is required'],
-        enum: ['Illegal Overtaking', 'Red Light Violation', 'Wrong Way Driving', 'Illegal Turn', 'Other'] 
+        enum: ['Illegal Overtaking', 'Red Light Violation', 'Public Lane Violation'] 
     },
     licensePlate: {
         type: String,

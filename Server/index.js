@@ -29,14 +29,14 @@ const connectDB = async () => {
   }
 };
 
-// 6. Routes
+//  Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/violations', require('./routes/violation'));
 app.get('/', (req, res) => res.send('PatrolVision API Running'));
 
 
 
-// 7. Start Server
+// Start Server
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);

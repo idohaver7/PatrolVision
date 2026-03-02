@@ -6,8 +6,8 @@ import { COLORS } from '../theme/colors';
 
 const SplashScreen = () => {
   //beginning of animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current;  // שקיפות מתחילה ב-0 (בלתי נראה)
-  const scaleAnim = useRef(new Animated.Value(0.5)).current; // גודל מתחיל ב-50%
+  const fadeAnim = useRef(new Animated.Value(0)).current;  
+  const scaleAnim = useRef(new Animated.Value(0.5)).current; 
 
   useEffect(() => {
     //start parallel animations
