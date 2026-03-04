@@ -35,8 +35,8 @@ const Login = () => {
     <div className="login-container">
       <div className="login-card">
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '20px' }}>
-          <Car size={48} color="#0D2A4D" />
-          <h1 style={{ margin: '10px 0', color: '#0D2A4D' }}>PatrolVision</h1>
+          <Car size={48} color="#081e39ff" />
+          <h1 style={{ margin: '10px 0', color: '#081e39ff' }}>PatrolVision</h1>
           <p style={{ color: '#6b7280' }}>Admin Dashboard</p>
         </div>
 

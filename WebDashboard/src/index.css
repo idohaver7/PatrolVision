@@ -145,3 +145,159 @@ body {
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
   border-color: var(--accent);
 }
+/* =========================================
+   מסך התחברות (Login) - עיצוב יוקרתי ומודרני
+   ========================================= */
+
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  /* רקע גרדיאנט כחול עמוק שמשדר אבטחה */
+  background: linear-gradient(135deg, #0D2A4D 0%, #1e3a8a 100%); 
+  margin: -2rem; /* מבטל את השוליים מה-root כדי למלא את המסך */
+}
+
+.login-card {
+  background: #ffffff;
+  padding: 3rem 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+}
+
+.input-group {
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #374151;
+}
+
+.input-field {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem; /* מרווח משמאל בשביל האייקון */
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+  background-color: #f9fafb;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 0.85rem;
+  background-color: #3b82f6;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  margin-top: 1rem;
+}
+
+.btn-primary:hover {
+  background-color: #2563eb;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.error-msg {
+  color: #b91c1c;
+  background-color: #fee2e2;
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  text-align: center;
+  border: 1px solid #f87171;
+}
+/* =========================================
+   נעילת הטבלה למניעת קפיצות
+   ========================================= */
+
+.modern-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  table-layout: fixed; /* זה מנעול הקסם! מונע מהעמודות לזוז */
+}
+
+.modern-table th, .modern-table td {
+  white-space: nowrap; /* מונע שבירת שורות */
+  overflow: hidden; /* מסתיר טקסט שחורג מהגבול */
+  text-overflow: ellipsis; /* מוסיף 3 נקודות (...) לטקסט ארוך מדי */
+}
+
+/* קיבוע רוחב העמודות כדי שלא ירקדו */
+.modern-table th:nth-child(1) { width: 100px; } /* עמודת התמונה */
+.modern-table th:nth-child(2) { width: 120px; } /* עמודת התאריך */
+.modern-table th:nth-child(4) { width: 220px; } /* עמודת המיקום - קצת יותר רחבה */
+.modern-table th:nth-child(7) { width: 120px; } /* עמודת הכפתורים */
+
+/* קיבוע גודל התמונה גם לפני שהיא נטענת */
+.violation-thumb {
+  width: 80px !important;
+  height: 50px !important;
+  object-fit: cover;
+  border-radius: 6px;
+  background-color: #e5e7eb; /* צבע אפור שומר מקום עד שהתמונה עולה */
+  display: block;
+}
+/* =========================================
+   עיצוב לחלון תיק העבירה המלא (Modal)
+   ========================================= */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(17, 16, 29, 0.85);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 1000; backdrop-filter: blur(5px);
+}
+
+.modal-content {
+  background: white; padding: 2rem; border-radius: 16px;
+  max-width: 900px; width: 95%; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: modalFadeIn 0.3s ease-out forwards;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-image {
+  width: 100%; border-radius: 8px;
+  max-height: 400px; object-fit: contain; background: #11101d;
+}
+
+/* שורות טבלה לחיצות */
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.clickable-row:hover {
+  background-color: #f1f5f9 !important;
+}

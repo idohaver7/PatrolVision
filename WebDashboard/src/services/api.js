@@ -72,5 +72,15 @@ export const updateViolationStatus = async (id, status) => {
     return { success: false };
   }
 };
+// עדכון לוחית רישוי ידנית
+export const updateViolationPlate = async (id, licensePlate) => {
+  try {
+    const response = await api.put(`/violations/${id}`, { licensePlate });
+    return response.data;
+  } catch (error) {
+    console.error(error);
+    return { success: false };
+  }
+};
 
 export default api;
