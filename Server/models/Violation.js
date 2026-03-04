@@ -41,7 +41,7 @@ const ViolationSchema = new mongoose.Schema({
     // Optional
     status: {
         type: String,
-        enum: ['Pending Review', 'Verified', 'Rejected', 'Closed'],
+        enum: ['Pending Review', 'Verified', 'Rejected'],
         default: 'Pending Review'
     },
     timestamp: {
