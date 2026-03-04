@@ -5,6 +5,7 @@ import numpy as np
 from ultralytics import YOLO
 import easyocr
 import re
+import time
 import os
 import math
 
@@ -24,7 +25,7 @@ try:
     print("✅ YOLO model loaded!")
     
     print("⏳ Loading OCR model (this might take a moment)...")
-    # Load English only since license plates are alphanumeric
+    # טוענים רק אנגלית כי לוחיות רישוי הן מספרים (שנחשבים אנגלית ב-OCR)
     reader = easyocr.Reader(['en'], gpu=False) 
     print("✅ OCR model loaded!")
 except Exception as e:
@@ -44,21 +45,21 @@ def is_center_inside(center, target_box):
 
 def calculate_intersection_ratio(box1, box2):
     """
-    Calculates the intersection area ratio between two bounding boxes.
-    Helps determine if a vehicle overlaps with a road line.
+    מחשב כמה אחוז מהשטח של התיבה הקטנה (הקו) מוכל בתוך התיבה הגדולה (הרכב)
+    או פשוט בודק אם יש מגע משמעותי
     """
     xA = max(box1[0], box2[0])
     yA = max(box1[1], box2[1])
     xB = min(box1[2], box2[2])
     yB = min(box1[3], box2[3])
 
-    # Calculate intersection area
+    # חישוב שטח החיתוך
     interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
     
-    # If there is no intersection
+    # אם אין חיתוך בכלל
     if interArea == 0: return 0
 
-    # Calculate the ratio relative to the smaller box (the line)
+    # נחשב את היחס ביחס לגודל הקו (box2 בדוגמה שלנו יהיה הקו)
     box2Area = (box2[2] - box2[0] + 1) * (box2[3] - box2[1] + 1)
     
     return interArea / float(box2Area)
@@ -73,7 +74,6 @@ def is_vehicle_relevant(box, min_area):
     width = box[2] - box[0]
     height = box[3] - box[1]
     return (width * height) > min_area
-
 # --- OCR FUNCTION ---
 def read_license_plate(img, plate_box):
     x1, y1, x2, y2 = map(int, plate_box)
@@ -94,63 +94,71 @@ def read_license_plate(img, plate_box):
             return None 
     except Exception:
         return None
-
-# --- LOGIC FUNCTIONS ---
-
-def find_active_red_lines(stop_lines, red_lights, green_lights, img_height):
+# --- LOGIC ---
+#Red Light Detection Helper
+def find_active_red_lines(stop_lines, red_lights, green_lights):
     """
-    Identifies which stop lines are currently associated with a red traffic light.
+    מחזירה רשימה של קווי עצירה שהרמזור המשויך אליהם הוא אדום.
+    הלוגיקה: משייכים לכל קו את הרמזור הכי קרוב אליו.
     """
     active_lines = []
     
-    # Use 80% of the image height instead of fixed pixels for dynamic scaling (e.g., mobile cameras)
-    max_distance = img_height * 0.8 
-    
     for line in stop_lines:
         l_center = get_center(line)
+        
         closest_red_dist = float('inf')
         closest_green_dist = float('inf')
         
+        # בדיקת מרחק לרמזורים אדומים
         for red in red_lights:
             dist = calculate_distance(l_center, get_center(red))
             if dist < closest_red_dist:
                 closest_red_dist = dist
                 
+        # בדיקת מרחק לרמזורים ירוקים
         for green in green_lights:
             dist = calculate_distance(l_center, get_center(green))
             if dist < closest_green_dist:
                 closest_green_dist = dist
         
-        # Filter out lines that are too far from any traffic light
-        if closest_red_dist > max_distance and closest_green_dist > max_distance:
+        # אם אין רמזורים קרובים בכלל (למשל מעל 400 פיקסל), מתעלמים מהקו
+        if min(closest_red_dist, closest_green_dist) > 400:
             continue
 
-        # Condition: Red light is within range and not significantly farther than the green light
-        if closest_red_dist < max_distance and closest_red_dist <= (closest_green_dist + 150):
+        # אם הרמזור האדום קרוב יותר מהירוק - הקו הזה "חם" (אסור לחצייה)
+        if closest_red_dist < closest_green_dist:
             active_lines.append(line)
-                
+            
     return active_lines
 
 def check_red_light_violation(vehicle, active_red_lines):
     """
-    Checks if a vehicle has crossed an active red stop line.
+    בודק אם רכב עבר קו עצירה שהוגדר כפעיל (באדום).
     """
     vx1, vy1, vx2, vy2 = vehicle
-    v_bottom = vy2 
-    v_center_x = (vx1 + vx2) / 2
-
+    v_bottom = vy2  # החלק התחתון של הרכב (גלגלים אחוריים בד"כ בפרספקטיבה רגילה)
+    
     for line in active_red_lines:
         lx1, ly1, lx2, ly2 = line
+        
+        # אנו מניחים קו אופקי. ניקח את ה-Y הממוצע שלו
         l_center_y = (ly1 + ly2) / 2
         l_min_x, l_max_x = min(lx1, lx2), max(lx1, lx2)
+        v_center_x = (vx1 + vx2) / 2
 
-        # Ensure the vehicle is horizontally aligned with the stop line lane
+        # 1. בדיקה אופקית: האם הרכב נמצא בכלל בנתיב של הקו?
+        # נוסיף קצת רחב (Margin) כדי לתפוס רכבים שחצי בחוץ
         if not (l_min_x - 20 < v_center_x < l_max_x + 20):
             continue
 
-        # Calculate vertical distance past the line (assuming perspective where lower Y means farther)
+        # 2. בדיקת חצייה (Perspective Dependent):
+        # הנחה: הרכב נוסע "למעלה" בתמונה (מתרחק), ולכן ה-Y שלו קטן.
+        # אם תחתית הרכב (מספר גבוה) קטנה (נמצאת מעל) ממרכז הקו -> הוא עבר אותו.
+        
+        # חישוב המרחק שהרכב עבר את הקו
         distance_past_line = l_center_y - v_bottom 
 
+        # אם הרכב עבר את הקו ביותר מ-X פיקסלים (TOLERANCE)
         if distance_past_line > RED_LIGHT_TOLERANCE:
             return True, line
             
@@ -210,10 +218,10 @@ def analyze_frame():
     
     if img is None:
         return jsonify({"error": "Invalid image"}), 400
+    print(f"✅ Image received! Size: {img.shape}")
     
     height, width, _ = img.shape
 
-    # Run YOLO inference
     results = model(img, conf=0.25) 
 
     detected_objects = {
@@ -224,7 +232,6 @@ def analyze_frame():
         "license_plates": [] 
     }
 
-    # Parse detected bounding boxes
     for result in results:
         for box in result.boxes:
             class_id = int(box.cls[0])
@@ -242,7 +249,7 @@ def analyze_frame():
             elif class_name == "taxi_hat": detected_objects["taxi_hats"].append(coords)
             elif class_name in ["license_plate", "license plate"]: detected_objects["license_plates"].append(coords)
 
-    # Filter out distant vehicles based on minimum area
+    # סינון רכבים רחוקים
     detected_objects["cars"] = [box for box in detected_objects["cars"] if is_vehicle_relevant(box, MIN_VEHICLE_AREA)]
     detected_objects["trucks"] = [box for box in detected_objects["trucks"] if is_vehicle_relevant(box, MIN_VEHICLE_AREA)]
 
@@ -253,15 +260,17 @@ def analyze_frame():
     private_vehicles = detected_objects["cars"] + detected_objects["trucks"]
     all_vehicles = private_vehicles + detected_objects["buses"]
 
-    # Helper function to find a license plate within a specific vehicle's bounding box
+    # פונקציית עזר למציאת לוחית של רכב ספציפי
     def find_plate_text_for_vehicle(vehicle_box):
+        # מחפש לוחית שנמצאת פיזית בתוך הריבוע של הרכב
         for plate in detected_objects["license_plates"]:
             plate_center = get_center(plate)
             if is_center_inside(plate_center, vehicle_box):
+                # מצאנו לוחית ששייכת לרכב הזה! נשלח ל-OCR
                 return read_license_plate(img, plate)
         return None
 
-    # --- RULE 1: Solid Line Violation ---
+   # --- RULE 1: Solid Line (STATE + CROSSING DETECTION) ---
     if not violation_detected:
         for vehicle in all_vehicles:
             vx1, vy1, vx2, vy2 = vehicle
@@ -273,32 +282,36 @@ def analyze_frame():
                 l_center_x = (lx1 + lx2) / 2
                 l_center_y = (ly1 + ly2) / 2
                 
-                # Pre-check: Ensure the line is vertically close to the vehicle
+                # בדיקה מקדימה: האם הקו בכלל רלוונטי לרכב הזה? (נמצא לידו בגובה)
                 if abs(l_center_y - v_center_y) > (height * 0.2):
                     continue
 
-                # 1. Calculate overlap ratio (if the vehicle is driving directly over the line)
+                # 1. חישוב חפיפה (למקרה שהוא דורס את הקו)
                 ratio = calculate_intersection_ratio(vehicle, line)
                 
-                # 2. Calculate horizontal distance (positive = left of the line, negative = right of the line)
+                # 2. חישוב מרחק אופקי (למקרה שהוא כבר עבר את הקו)
+                # חיובי אם הרכב משמאל לקו, שלילי אם מימין
                 dist_x = l_center_x - v_center_x 
                 
-                # Condition A: Vehicle overlaps the line significantly
+                # תנאי א': הרכב דורס את הקו (כמו מקודם)
                 condition_touching = (ratio > 0.15)
                 
-                # Condition B: Vehicle is entirely to the left of the line, but within oncoming lane bounds
+                # תנאי ב': הרכב נמצא כולו משמאל לקו, אבל קרוב אליו (בנתיב הנגדי)
+                # אנו מניחים שרוחב נתיב הוא בערך רוחב וחצי של רכב
+                # אז אם הוא משמאל לקו, ומרחק המרכזים הוא לא עצום - הוא בנתיב הנגדי
                 condition_left_side = (dist_x > 0) and (dist_x < v_width * 2.5)
 
                 if condition_touching or condition_left_side:
+                    
                     violation_detected = True
                     violation_type = "Illegal Overtaking"
                     plate_num = find_plate_text_for_vehicle(vehicle)
                     violation_data = {"box": vehicle, "plate": plate_num}
+                    
+                    print(f"DEBUG: Solid Line Violation! Ratio: {ratio:.2f}, Dist: {dist_x:.1f}")
                     break
-            
             if violation_detected: break
-
-    # --- RULE 2: Public Transport Lane Violation ---
+    # --- RULE 2: Bus Lane ---
     if not violation_detected:
         if len(detected_objects["bus_lines"]) > 0:
             for vehicle in private_vehicles:
@@ -307,31 +320,29 @@ def analyze_frame():
                     if is_center_inside(get_center(hat), vehicle):
                         is_taxi = True
                         break
-                
                 if is_taxi: continue 
 
                 is_violation, reason = check_bus_lane_violation(vehicle, detected_objects["bus_lines"], height)
                 
                 if is_violation:
                     violation_detected = True
-                    violation_type = "Public Lane Violation"
+                    violation_type = f"Public Lane Violation"
+                    # שליחת הלוחית לזיהוי
                     plate_num = find_plate_text_for_vehicle(vehicle)
                     violation_data = {"box": vehicle, "plate": plate_num}
                     break
 
-    # --- RULE 3: Red Light Violation ---
+    # --- RULE 3: Red Light ---
     if not violation_detected:
-        # Identify active stop lines associated with red lights
+        # קודם מוצאים אילו קווים הם "אדומים" כרגע
         active_lines = find_active_red_lines(
             detected_objects["stop_lines"], 
             detected_objects["red_lights"], 
-            detected_objects["green_lights"],
-            height
+            detected_objects["green_lights"]
         )
         
         if len(active_lines) > 0:
             for vehicle in all_vehicles:
-                # Check if the vehicle crossed any of the active red lines
                 is_violation, line_crossed = check_red_light_violation(vehicle, active_lines)
                 
                 if is_violation:
@@ -339,14 +350,14 @@ def analyze_frame():
                     violation_type = "Red Light Violation"
                     plate_num = find_plate_text_for_vehicle(vehicle)
                     violation_data = {"box": vehicle, "plate": plate_num, "line": line_crossed}
+                    print(f"🚨 VIOLATION: Red Light! Plate: {plate_num}")
                     break
                 
-    # Logging the final result
     if violation_detected:
         plate_str = violation_data.get('plate') if violation_data.get('plate') else "Unknown"
-        print(f"⚠️ VIOLATION DETECTED: {violation_type} | Plate: {plate_str}")
+        print(f"⚠️ VIOLATION: {violation_type} | Plate: {plate_str}")
     else:
-        print("✅ Clean frame") 
+        print("✅ Clean frame")   
    
     return jsonify({
         "violation_detected": violation_detected,

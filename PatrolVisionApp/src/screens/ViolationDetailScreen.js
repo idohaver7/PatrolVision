@@ -45,7 +45,7 @@ const ViolationDetailScreen = ({ route }) => {
         {/*  Header Image */}
         <View style={styles.imageContainer}>
           <Image 
-            source={{ uri: `${SERVER_URL}/${violation.mediaUrl}` }} 
+            source={{ uri: `${SERVER_URL}/${violation.mediaUrl}`}}
             style={styles.image} 
             resizeMode="contain" 
             resizeMethod='resize'

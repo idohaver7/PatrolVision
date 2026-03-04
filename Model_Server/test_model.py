@@ -49,7 +49,7 @@ def inspect_model_predictions(model_path, image_path, conf_threshold=0.25):
 # --- Configuration ---
 # Replace these with your actual file paths
 MODEL_PATH = 'traffic_model.pt'  # Path to your .pt file (e.g., 'best.pt')
-IMAGE_PATH = '6.png' # Path to the image you uploaded
+IMAGE_PATH = '7.png' # Path to the image you uploaded
 CONFIDENCE = 0.15 # The threshold you mentioned
 
 if __name__ == "__main__":
