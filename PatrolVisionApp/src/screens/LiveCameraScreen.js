@@ -15,7 +15,7 @@ import {
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-// import ImageResizer from "@bam.tech/react-native-image-resizer";  
+import KeepAwake from 'react-native-keep-awake'
 import Geolocation from 'react-native-geolocation-service';
 
 import { analyzeTrafficFrame } from '../services/api';
@@ -297,7 +297,7 @@ const LiveCameraScreen = ({ navigation }) => {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { flex: 1 }]}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       <Camera
@@ -327,6 +327,7 @@ const LiveCameraScreen = ({ navigation }) => {
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
         <SwipeButton onSwipeSuccess={handleEndTrip} />
       </View>
+      <KeepAwake /> 
     </View>
   );
 };

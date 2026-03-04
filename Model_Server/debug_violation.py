@@ -4,7 +4,7 @@ from ultralytics import YOLO
 import math
 
 # --- CONFIGURATION (Must match app.py) ---
-IMAGE_PATH = "third.png"  # Ensure this matches your image filename
+IMAGE_PATH = "6.png"  # Ensure this matches your image filename
 MODEL_PATH = "traffic_model.pt"
 LANE_SIDE = 'right'      
 MIN_VEHICLE_AREA = 4000  
