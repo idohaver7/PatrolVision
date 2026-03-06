@@ -78,20 +78,25 @@ def is_vehicle_relevant(box, min_area):
 def read_license_plate(img, plate_box):
     x1, y1, x2, y2 = map(int, plate_box)
     h, w, _ = img.shape
-    x1, y1 = max(0, x1-5), max(0, y1-5)
-    x2, y2 = min(w, x2+5), min(h, y2+5)
+    x1, y1 = max(0, x1-10), max(0, y1-10)
+    x2, y2 = min(w, x2+10), min(h, y2+10)
     
     plate_img = img[y1:y2, x1:x2]
+    # Save the cropped plate image for debugging
+    debug_path = "plate_debug.jpg"
+    cv2.imwrite(debug_path, plate_img)
     
     try:
-        results = reader.readtext(plate_img, detail=0)
+        results = reader.readtext(plate_img, detail=0, paragraph=False)
         full_text = "".join(results)
+        print(f"DEBUG OCR Raw text: {full_text}") # Check what EasyOCR actually saw
         clean_number = re.sub(r'[^0-9]', '', full_text)
         
         if 6 <= len(clean_number) <= 8:
             return clean_number
-        else:
-            return None 
+        if len(full_text) > 0:
+            return f"Raw:{full_text}"
+        return None 
     except Exception:
         return None
 
@@ -206,7 +211,7 @@ def analyze_frame():
 
     file = request.files['frame']
     np_arr = np.frombuffer(file.read(), np.uint8)
-    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR )
     
     if img is None:
         return jsonify({"error": "Invalid image"}), 400
@@ -255,12 +260,25 @@ def analyze_frame():
 
     # Helper function to find a license plate within a specific vehicle's bounding box
     def find_plate_text_for_vehicle(vehicle_box):
-        for plate in detected_objects["license_plates"]:
-            plate_center = get_center(plate)
-            if is_center_inside(plate_center, vehicle_box):
-                return read_license_plate(img, plate)
-        return None
+        vx1, vy1, vx2, vy2 = map(int, vehicle_box)
+        plates = detected_objects["license_plates"]
+        
+        # Debugging output to see how many plates are being analyzed for this vehicle
+        if len(plates) > 0:
+            print(f"\n🕵️ Analyzing {len(plates)} plates for vehicle at [{vx1}, {vy1}]")
 
+        for i, plate in enumerate(plates):
+            # Calculate how much of the plate overlaps with the vehicle bounding box
+            ratio = calculate_intersection_ratio(vehicle_box, plate)
+            
+            print(f"  - Plate #{i} Overlap: {ratio:.4f}")
+
+            #if the plate overlaps significantly with the vehicle, we consider it a match
+            if ratio > 0.5:
+                print(f"  ✅ MATCH! Ratio {ratio:.4f} is high enough. Sending to OCR...")
+                return read_license_plate(img, plate)
+        
+        return None
     # --- RULE 1: Solid Line Violation ---
     if not violation_detected:
         for vehicle in all_vehicles:
@@ -302,14 +320,23 @@ def analyze_frame():
     if not violation_detected:
         if len(detected_objects["bus_lines"]) > 0:
             for vehicle in private_vehicles:
+                # Optimized Taxi Check
                 is_taxi = False
+                vx1, vy1, vx2, vy2 = vehicle
+                
+                # We expand the search area 20 pixels upwards to catch hats sitting on the roof
                 for hat in detected_objects["taxi_hats"]:
-                    if is_center_inside(get_center(hat), vehicle):
+                    hx, hy = get_center(hat)
+                    # Check if hat center is inside vehicle OR slightly above it
+                    if (vx1 < hx < vx2) and (vy1 - 30 < hy < vy2): 
                         is_taxi = True
                         break
                 
-                if is_taxi: continue 
+                if is_taxi: 
+                    print("🚖 Taxi detected in bus lane - Skipping violation check.")
+                    continue 
 
+                # Proceed with bus lane check for private cars
                 is_violation, reason = check_bus_lane_violation(vehicle, detected_objects["bus_lines"], height)
                 
                 if is_violation:
