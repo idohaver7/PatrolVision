@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { CheckCircle, XCircle, LogOut, CheckSquare, Ban, Search, Map as MapIcon, List as ListIcon, LayoutDashboard, AlertTriangle, Inbox, User, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 
-// --- Colors ---
+// --- Global Constants & Configurations ---
 const VIOLATION_COLORS = {
   'Red Light Violation': '#ef4444',
   'Illegal Overtaking': '#f59e0b',
@@ -15,36 +15,45 @@ const VIOLATION_COLORS = {
 const VIOLATION_TYPES = ['All Types', 'Public Lane Violation', 'Red Light Violation', 'Illegal Overtaking'];
 
 const Dashboard = () => {
+  // --- Data & Loading States ---
   const [allViolations, setAllViolations] = useState([]); 
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   
+  // --- User Session State ---
   const [adminName, setAdminName] = useState('Admin');
 
+  // --- UI & Filtering States ---
   const [currentTab, setCurrentTab] = useState('Pending Review');
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
   const [searchText, setSearchText] = useState('');
   const [filterType, setFilterType] = useState('All Types');
 
+  // --- Pagination States ---
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  // משתני החלון הקופץ (Modal) של פרטי העבירה
+  // --- Modal States: Master-Detail View & ALPR Manual Override ---
   const [editingViolation, setEditingViolation] = useState(null);
   const [newPlate, setNewPlate] = useState('');
 
-  // משתנה לחלון הקופץ החדש - אישור/דחייה מותאם אישית
+  // --- Modal States: Custom Confirmation ---
   const [confirmAction, setConfirmAction] = useState({ isOpen: false, id: null, newStatus: '' });
 
+  /**
+   * Initializes dashboard data by fetching user details, analytics, and violation records.
+   */
   const loadData = async () => {
     setLoading(true);
     try {
+      // Retrieve locally stored user session
       const userStr = localStorage.getItem('user');
       if (userStr) {
         const user = JSON.parse(userStr);
         setAdminName(user.firstName || 'Admin');
       }
 
+      // Fetch analytics and violations concurrently for performance
       const [statsData, violationsData] = await Promise.all([
         getAnalytics(),
         getAllViolations({ limit: 1000 })
@@ -52,18 +61,27 @@ const Dashboard = () => {
       setStats(statsData.data);
       setAllViolations(violationsData.data);
     } catch (error) {
-      console.error("Error loading data", error);
+      console.error("Error loading dashboard data:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  // Fetch data on component mount
+  useEffect(() => { 
+    loadData(); 
+  }, []);
 
+  /**
+   * Memoized filtering logic.
+   * Re-evaluates only when violations data, current tab, or filter parameters change.
+   */
   const filteredViolations = useMemo(() => {
     return allViolations.filter(v => {
+      // 1. Filter by Status Tab
       const matchesTab = v.status === currentTab;
       
+      // 2. Filter by Search Query (Plate, Address, User Name, Type)
       const query = searchText.toLowerCase();
       const plate = v.licensePlate?.toLowerCase() || '';
       const address = v.address?.toLowerCase() || '';
@@ -76,54 +94,67 @@ const Dashboard = () => {
         userName.includes(query) ||
         type.includes(query);
 
+      // 3. Filter by Violation Type Dropdown
       const matchesType = filterType === 'All Types' || v.violationType === filterType;
 
       return matchesTab && matchesSearch && matchesType;
     });
   }, [allViolations, currentTab, searchText, filterType]);
 
+  // Reset pagination to the first page whenever filters or tabs change
   useEffect(() => {
     setCurrentPage(1);
   }, [currentTab, searchText, filterType]);
 
+  // --- Pagination Logic ---
   const totalPages = Math.ceil(filteredViolations.length / ITEMS_PER_PAGE);
   const paginatedViolations = filteredViolations.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
 
-  // פותח את חלון האישור המותאם אישית במקום של הדפדפן
+  /**
+   * Triggers the custom confirmation modal before executing a status change.
+   */
   const handleStatusChange = (id, newStatus) => {
     setConfirmAction({ isOpen: true, id, newStatus });
   };
 
-  // הפונקציה שמופעלת כשלוחצים "Yes" בחלון האישור
+  /**
+   * Executes the API call to update the violation status after user confirmation.
+   */
   const executeStatusChange = async () => {
     const { id, newStatus } = confirmAction;
     
-    // סוגרים את חלון האישור
+    // Close the confirmation modal
     setConfirmAction({ isOpen: false, id: null, newStatus: '' });
 
-    // סוגרים את חלון הפירוט המלא אם הוא פתוח
+    // Close the Master-Detail review modal if it is currently open for this item
     if (editingViolation && editingViolation._id === id) {
         setEditingViolation(null);
     }
 
+    // Optimistic UI update for immediate feedback
     setAllViolations(prev => prev.map(v => v._id === id ? { ...v, status: newStatus } : v));
     
     try {
       await updateViolationStatus(id, newStatus);
+      // Refresh analytics to reflect the new status
       const newStats = await getAnalytics();
       setStats(newStats.data);
     } catch (error) {
-      console.error("Failed", error);
-      loadData();
+      console.error("Failed to update status:", error);
+      loadData(); // Revert UI on failure
     }
   };
 
+  /**
+   * Submits the manual ALPR (Automatic License Plate Recognition) override to the server.
+   */
   const handleSavePlate = async () => {
     if (!editingViolation) return;
     
+    // Optimistic UI update
     setAllViolations(prev => prev.map(v => 
       v._id === editingViolation._id ? { ...v, licensePlate: newPlate } : v
     ));
@@ -131,18 +162,24 @@ const Dashboard = () => {
 
     try {
       await updateViolationPlate(editingViolation._id, newPlate);
-      // במקום alert מכוער של הדפדפן, פשוט נסגור את החלון בחלקות (UX הרבה יותר טוב)
+      // Close the modal silently upon success for a seamless user experience
       setEditingViolation(null);
     } catch (error) {
-      console.error("Failed to update plate", error);
+      console.error("Failed to update license plate:", error);
     }
   };
 
+  /**
+   * Opens the Master-Detail modal and populates it with the selected violation's data.
+   */
   const openViolationDetails = (violation) => {
       setEditingViolation(violation);
       setNewPlate(violation.licensePlate !== 'null' && violation.licensePlate ? violation.licensePlate : '');
   };
 
+  /**
+   * Formats the media URL securely, ensuring proper local server routing if needed.
+   */
   const getImageUrl = (url) => {
     if (!url) return 'https://via.placeholder.com/80?text=No+Image';
     if (url.startsWith('http')) return url;
@@ -154,6 +191,7 @@ const Dashboard = () => {
   return (
     <div className="dashboard-container">
       
+      {/* --- Top Navigation Header --- */}
       <div className="header-bar">
         <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
             <LayoutDashboard size={36} className="text-blue-600" style={{color: '#11101d'}} />
@@ -179,6 +217,7 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* --- KPI Statistics Row --- */}
       <div className="stats-grid">
         <StatCard 
           title="Total Reports" 
@@ -200,6 +239,7 @@ const Dashboard = () => {
         />
       </div>
 
+      {/* --- Main Toolbar: Filters, Search, and View Toggles --- */}
       <div className="toolbar">
         <div className="filter-group">
             <TabButton label="Inbox" count={stats?.statusStats.find(s => s._id === 'Pending Review')?.count} isActive={currentTab === 'Pending Review'} onClick={() => setCurrentTab('Pending Review')} icon={<Inbox size={16}/>} />
@@ -228,10 +268,13 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* --- Main Content Area --- */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
+        {/* Data View: Map or List */}
         <div className="content-card">
             
+            {/* MAP VIEW */}
             {viewMode === 'map' && (
                 <div style={{ height: '700px', width: '100%' }}>
                     <MapContainer center={[32.0853, 34.7818]} zoom={9} style={{ height: '100%', width: '100%' }}>
@@ -255,6 +298,7 @@ const Dashboard = () => {
                 </div>
             )}
 
+            {/* LIST VIEW (Data Table) */}
             {viewMode === 'list' && (
                 <>
                  <div className="content-header">
@@ -337,6 +381,7 @@ const Dashboard = () => {
                             </table>
                         </div>
 
+                        {/* Pagination Controls */}
                         {totalPages > 1 && (
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderTop: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
                                 <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
@@ -372,6 +417,7 @@ const Dashboard = () => {
             )}
         </div>
 
+        {/* Analytics Chart Section (Displayed below the list view) */}
         {viewMode === 'list' && stats && (
             <div className="content-card" style={{ marginBottom: '40px' }}>
                 <div className="content-header">
@@ -416,6 +462,7 @@ const Dashboard = () => {
                         </ResponsiveContainer>
                     </div>
 
+                    {/* Chart Legend */}
                     <div style={{ 
                         display: 'flex', 
                         flexWrap: 'wrap', 
@@ -447,8 +494,10 @@ const Dashboard = () => {
       </div>
 
       {/* =========================================
-          חלון ה"תיק עבירה" המלא
+          MODALS SECTION
           ========================================= */}
+
+      {/* 1. Master-Detail Review Modal */}
       {editingViolation && (
         <div className="modal-overlay" onClick={() => setEditingViolation(null)}>
             <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -462,6 +511,7 @@ const Dashboard = () => {
                 
                 <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
                     
+                    {/* Left Column: Evidence Media */}
                     <div style={{ flex: '1 1 400px' }}>
                         <a href={getImageUrl(editingViolation.mediaUrl)} target="_blank" rel="noopener noreferrer" title="Click to open full size in new tab">
                             <img 
@@ -474,6 +524,7 @@ const Dashboard = () => {
                         <p style={{textAlign: 'center', fontSize: '0.8rem', color: '#9ca3af', marginTop: '5px'}}>Click image to open in full resolution</p>
                     </div>
 
+                    {/* Right Column: Violation Details & Actions */}
                     <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column' }}>
                         
                         <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
@@ -499,6 +550,7 @@ const Dashboard = () => {
                             </div>
                         </div>
 
+                        {/* ALPR Manual Override Input */}
                         <div className="input-group" style={{ marginBottom: '20px' }}>
                             <label style={{fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#11101d'}}>Manual ALPR Override (Plate Number):</label>
                             <div style={{ display: 'flex', gap: '10px' }}>
@@ -514,6 +566,7 @@ const Dashboard = () => {
                             </div>
                         </div>
 
+                        {/* Action Buttons (Only visible for Pending items) */}
                         {editingViolation.status === 'Pending Review' && (
                             <div style={{ display: 'flex', gap: '15px', marginTop: 'auto', paddingTop: '15px' }}>
                                 <button 
@@ -533,6 +586,7 @@ const Dashboard = () => {
                             </div>
                         )}
                         
+                        {/* Status Label (For non-pending items) */}
                         {editingViolation.status !== 'Pending Review' && (
                              <div style={{ marginTop: 'auto', textAlign: 'center', padding: '15px', background: editingViolation.status === 'Verified' ? '#dcfce7' : '#fee2e2', borderRadius: '8px', color: editingViolation.status === 'Verified' ? '#166534' : '#991b1b', fontWeight: 'bold' }}>
                                  This report was {editingViolation.status}
@@ -545,9 +599,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* =========================================
-          חלון אזהרה לאישור שינוי סטטוס (Custom Confirm)
-          ========================================= */}
+      {/* 2. Custom Confirmation Modal */}
       {confirmAction.isOpen && (
         <div className="modal-overlay" style={{ zIndex: 2000 }}>
           <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', padding: '30px' }}>
@@ -586,6 +638,11 @@ const Dashboard = () => {
   );
 };
 
+// --- Sub-Components ---
+
+/**
+ * Renders a statistic card for the KPI banner.
+ */
 const StatCard = ({ title, value, icon, color }) => (
     <div className="stat-card" style={{ borderLeft: `5px solid ${color}` }}>
       <div>
@@ -596,6 +653,9 @@ const StatCard = ({ title, value, icon, color }) => (
     </div>
 );
 
+/**
+ * Renders a functional tab button with an optional notification badge.
+ */
 const TabButton = ({ label, count, isActive, onClick, icon }) => (
     <button onClick={onClick} style={{ padding: '8px 16px', border: 'none', background: isActive ? '#11101d' : 'transparent', color: isActive ? 'white' : '#6b7280', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '8px' }}>
         {icon} {label}

@@ -22,8 +22,8 @@ body {
 
 /* --- Layout Updates: Full Width --- */
 .dashboard-container {
-  width: 100%;           /* רוחב מלא */
-  padding: 1.5rem 2rem;  /* מרווחים מהצדדים */
+  width: 100%;          
+  padding: 1.5rem 2rem;  
   box-sizing: border-box;
 }
 
@@ -43,7 +43,7 @@ body {
 /* --- Stats Cards --- */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* כרטיסים רחבים יותר */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
   gap: 1.5rem;
   margin-bottom: 2rem;
 }
@@ -126,7 +126,7 @@ body {
 .modern-table td { padding: 1rem 1.5rem; border-bottom: 1px solid #f3f4f6; font-size: 0.95rem; vertical-align: middle; }
 .modern-table tr:hover { background-color: #f8fafc; }
 
-/* --- תמונה מוקטנת (Thumbnail) --- */
+
 .violation-thumb {
   width: 80px;
   height: 50px;
@@ -137,26 +137,22 @@ body {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* אפקט הגדלה כשעוברים עם העכבר */
+
 .violation-thumb:hover {
-  transform: scale(2.5); /* מגדיל פי 2.5 */
+  transform: scale(2.5); 
   position: relative;
   z-index: 10;
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
   border-color: var(--accent);
 }
-/* =========================================
-   מסך התחברות (Login) - עיצוב יוקרתי ומודרני
-   ========================================= */
 
 .login-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  /* רקע גרדיאנט כחול עמוק שמשדר אבטחה */
   background: linear-gradient(135deg, #0D2A4D 0%, #1e3a8a 100%); 
-  margin: -2rem; /* מבטל את השוליים מה-root כדי למלא את המסך */
+  margin: -2rem; 
 }
 
 .login-card {
@@ -182,7 +178,7 @@ body {
 
 .input-field {
   width: 100%;
-  padding: 0.75rem 1rem 0.75rem 2.5rem; /* מרווח משמאל בשביל האייקון */
+  padding: 0.75rem 1rem 0.75rem 2.5rem; 
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 1rem;
@@ -235,40 +231,35 @@ body {
   text-align: center;
   border: 1px solid #f87171;
 }
-/* =========================================
-   נעילת הטבלה למניעת קפיצות
-   ========================================= */
 
 .modern-table { 
   width: 100%; 
   border-collapse: collapse; 
-  table-layout: fixed; /* זה מנעול הקסם! מונע מהעמודות לזוז */
+  table-layout: fixed; 
 }
 
 .modern-table th, .modern-table td {
-  white-space: nowrap; /* מונע שבירת שורות */
-  overflow: hidden; /* מסתיר טקסט שחורג מהגבול */
-  text-overflow: ellipsis; /* מוסיף 3 נקודות (...) לטקסט ארוך מדי */
+  white-space: nowrap; 
+  overflow: hidden;
+  text-overflow: ellipsis; 
 }
 
-/* קיבוע רוחב העמודות כדי שלא ירקדו */
-.modern-table th:nth-child(1) { width: 100px; } /* עמודת התמונה */
-.modern-table th:nth-child(2) { width: 120px; } /* עמודת התאריך */
-.modern-table th:nth-child(4) { width: 220px; } /* עמודת המיקום - קצת יותר רחבה */
-.modern-table th:nth-child(7) { width: 120px; } /* עמודת הכפתורים */
 
-/* קיבוע גודל התמונה גם לפני שהיא נטענת */
+.modern-table th:nth-child(1) { width: 100px; } 
+.modern-table th:nth-child(2) { width: 120px; } 
+.modern-table th:nth-child(4) { width: 220px; } 
+.modern-table th:nth-child(7) { width: 120px; } 
+
+
 .violation-thumb {
   width: 80px !important;
   height: 50px !important;
   object-fit: cover;
   border-radius: 6px;
-  background-color: #e5e7eb; /* צבע אפור שומר מקום עד שהתמונה עולה */
+  background-color: #e5e7eb; 
   display: block;
 }
-/* =========================================
-   עיצוב לחלון תיק העבירה המלא (Modal)
-   ========================================= */
+
 .modal-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(17, 16, 29, 0.85);
@@ -293,7 +284,7 @@ body {
   max-height: 400px; object-fit: contain; background: #11101d;
 }
 
-/* שורות טבלה לחיצות */
+
 .clickable-row {
   cursor: pointer;
   transition: background-color 0.2s;
