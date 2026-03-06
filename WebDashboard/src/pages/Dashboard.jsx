@@ -1,46 +1,59 @@
 // src/pages/Dashboard.jsx
 import React, { useEffect, useState, useMemo } from 'react';
-import { getAnalytics, getAllViolations, updateViolationStatus, logout } from '../services/api';
+import { getAnalytics, getAllViolations, updateViolationStatus, updateViolationPlate, logout } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import { CheckCircle, XCircle, LogOut, CheckSquare, Ban, Search, Map as MapIcon, List as ListIcon, LayoutDashboard, AlertTriangle, Inbox, User } from 'lucide-react'; // הוספתי אייקון User
+import { CheckCircle, XCircle, LogOut, CheckSquare, Ban, Search, Map as MapIcon, List as ListIcon, LayoutDashboard, AlertTriangle, Inbox, User, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 
-// --- Colors ---
+// --- Global Constants & Configurations ---
 const VIOLATION_COLORS = {
   'Red Light Violation': '#ef4444',
   'Illegal Overtaking': '#f59e0b',
-  'Wrong Way Driving': '#b91c1c',
-  'Illegal Parking': '#3b82f6',
-  'Illegal Turn': '#8b5cf6',
-  'Other': '#6b7280'
+  'Public Lane Violation': '#8b5cf6'
 };
 
-const VIOLATION_TYPES = ['All Types', 'Red Light Violation', 'Illegal Overtaking', 'Wrong Way Driving', 'Illegal Parking', 'Illegal Turn'];
+const VIOLATION_TYPES = ['All Types', 'Public Lane Violation', 'Red Light Violation', 'Illegal Overtaking'];
 
 const Dashboard = () => {
+  // --- Data & Loading States ---
   const [allViolations, setAllViolations] = useState([]); 
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // --- משתנה לשם האדמין ---
+  // --- User Session State ---
   const [adminName, setAdminName] = useState('Admin');
 
+  // --- UI & Filtering States ---
   const [currentTab, setCurrentTab] = useState('Pending Review');
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
   const [searchText, setSearchText] = useState('');
   const [filterType, setFilterType] = useState('All Types');
 
+  // --- Pagination States ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  // --- Modal States: Master-Detail View & ALPR Manual Override ---
+  const [editingViolation, setEditingViolation] = useState(null);
+  const [newPlate, setNewPlate] = useState('');
+
+  // --- Modal States: Custom Confirmation ---
+  const [confirmAction, setConfirmAction] = useState({ isOpen: false, id: null, newStatus: '' });
+
+  /**
+   * Initializes dashboard data by fetching user details, analytics, and violation records.
+   */
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. שליפת שם המשתמש מהזכרון המקומי
+      // Retrieve locally stored user session
       const userStr = localStorage.getItem('user');
       if (userStr) {
         const user = JSON.parse(userStr);
         setAdminName(user.firstName || 'Admin');
       }
 
-      // 2. טעינת נתונים מהשרת
+      // Fetch analytics and violations concurrently for performance
       const [statsData, violationsData] = await Promise.all([
         getAnalytics(),
         getAllViolations({ limit: 1000 })
@@ -48,19 +61,27 @@ const Dashboard = () => {
       setStats(statsData.data);
       setAllViolations(violationsData.data);
     } catch (error) {
-      console.error("Error loading data", error);
+      console.error("Error loading dashboard data:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  // Fetch data on component mount
+  useEffect(() => { 
+    loadData(); 
+  }, []);
 
-  // --- מנגנון סינון וחיפוש ---
+  /**
+   * Memoized filtering logic.
+   * Re-evaluates only when violations data, current tab, or filter parameters change.
+   */
   const filteredViolations = useMemo(() => {
     return allViolations.filter(v => {
+      // 1. Filter by Status Tab
       const matchesTab = v.status === currentTab;
       
+      // 2. Filter by Search Query (Plate, Address, User Name, Type)
       const query = searchText.toLowerCase();
       const plate = v.licensePlate?.toLowerCase() || '';
       const address = v.address?.toLowerCase() || '';
@@ -73,23 +94,96 @@ const Dashboard = () => {
         userName.includes(query) ||
         type.includes(query);
 
+      // 3. Filter by Violation Type Dropdown
       const matchesType = filterType === 'All Types' || v.violationType === filterType;
 
       return matchesTab && matchesSearch && matchesType;
     });
   }, [allViolations, currentTab, searchText, filterType]);
 
-  const handleStatusChange = async (id, newStatus) => {
-    if (!window.confirm(`Mark as ${newStatus}?`)) return;
+  // Reset pagination to the first page whenever filters or tabs change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentTab, searchText, filterType]);
+
+  // --- Pagination Logic ---
+  const totalPages = Math.ceil(filteredViolations.length / ITEMS_PER_PAGE);
+  const paginatedViolations = filteredViolations.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  /**
+   * Triggers the custom confirmation modal before executing a status change.
+   */
+  const handleStatusChange = (id, newStatus) => {
+    setConfirmAction({ isOpen: true, id, newStatus });
+  };
+
+  /**
+   * Executes the API call to update the violation status after user confirmation.
+   */
+  const executeStatusChange = async () => {
+    const { id, newStatus } = confirmAction;
+    
+    // Close the confirmation modal
+    setConfirmAction({ isOpen: false, id: null, newStatus: '' });
+
+    // Close the Master-Detail review modal if it is currently open for this item
+    if (editingViolation && editingViolation._id === id) {
+        setEditingViolation(null);
+    }
+
+    // Optimistic UI update for immediate feedback
     setAllViolations(prev => prev.map(v => v._id === id ? { ...v, status: newStatus } : v));
+    
     try {
       await updateViolationStatus(id, newStatus);
+      // Refresh analytics to reflect the new status
       const newStats = await getAnalytics();
       setStats(newStats.data);
     } catch (error) {
-      console.error("Failed", error);
-      loadData();
+      console.error("Failed to update status:", error);
+      loadData(); // Revert UI on failure
     }
+  };
+
+  /**
+   * Submits the manual ALPR (Automatic License Plate Recognition) override to the server.
+   */
+  const handleSavePlate = async () => {
+    if (!editingViolation) return;
+    
+    // Optimistic UI update
+    setAllViolations(prev => prev.map(v => 
+      v._id === editingViolation._id ? { ...v, licensePlate: newPlate } : v
+    ));
+    setEditingViolation(prev => ({...prev, licensePlate: newPlate}));
+
+    try {
+      await updateViolationPlate(editingViolation._id, newPlate);
+      // Close the modal silently upon success for a seamless user experience
+      setEditingViolation(null);
+    } catch (error) {
+      console.error("Failed to update license plate:", error);
+    }
+  };
+
+  /**
+   * Opens the Master-Detail modal and populates it with the selected violation's data.
+   */
+  const openViolationDetails = (violation) => {
+      setEditingViolation(violation);
+      setNewPlate(violation.licensePlate !== 'null' && violation.licensePlate ? violation.licensePlate : '');
+  };
+
+  /**
+   * Formats the media URL securely, ensuring proper local server routing if needed.
+   */
+  const getImageUrl = (url) => {
+    if (!url) return 'https://via.placeholder.com/80?text=No+Image';
+    if (url.startsWith('http')) return url;
+    return `http://localhost:5000${url.startsWith('/') ? '' : '/'}${url}`; 
   };
 
   if (loading) return <div className="p-10 text-center text-gray-500">Loading PatrolVision Dashboard...</div>;
@@ -97,9 +191,8 @@ const Dashboard = () => {
   return (
     <div className="dashboard-container">
       
-      {/* --- Header --- */}
+      {/* --- Top Navigation Header --- */}
       <div className="header-bar">
-        {/* צד שמאל: לוגו */}
         <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
             <LayoutDashboard size={36} className="text-blue-600" style={{color: '#11101d'}} />
             <div>
@@ -108,7 +201,6 @@ const Dashboard = () => {
             </div>
         </div>
 
-        {/* צד ימין: ברכה וכפתור יציאה */}
         <div style={{display: 'flex', alignItems: 'center', gap: '20px'}}>
             <div style={{display: 'flex', alignItems: 'center', gap: '8px', background: 'white', padding: '8px 16px', borderRadius: '30px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)'}}>
                 <div style={{background: '#e0e7ff', padding: '6px', borderRadius: '50%', color: '#3730a3'}}>
@@ -125,7 +217,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* --- Stats Row --- */}
+      {/* --- KPI Statistics Row --- */}
       <div className="stats-grid">
         <StatCard 
           title="Total Reports" 
@@ -147,7 +239,7 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* --- Toolbar --- */}
+      {/* --- Main Toolbar: Filters, Search, and View Toggles --- */}
       <div className="toolbar">
         <div className="filter-group">
             <TabButton label="Inbox" count={stats?.statusStats.find(s => s._id === 'Pending Review')?.count} isActive={currentTab === 'Pending Review'} onClick={() => setCurrentTab('Pending Review')} icon={<Inbox size={16}/>} />
@@ -176,11 +268,11 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* --- Main Content --- */}
-      <div style={{ display: 'grid', gridTemplateColumns: viewMode === 'map' ? '1fr' : '3fr 1fr', gap: '2rem' }}>
+      {/* --- Main Content Area --- */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* Left Column: Data */}
-        <div className="content-card" style={{ minHeight: '600px' }}>
+        {/* Data View: Map or List */}
+        <div className="content-card">
             
             {/* MAP VIEW */}
             {viewMode === 'map' && (
@@ -192,10 +284,11 @@ const Dashboard = () => {
                             <Marker key={v._id} position={[v.location.coordinates[1], v.location.coordinates[0]]}>
                                 <Popup>
                                     <div style={{ textAlign: 'center' }}>
-                                        <img src={v.mediaUrl} alt="Evidence" style={{width: '100%', borderRadius: '4px', marginBottom: '5px'}} />
+                                        <img src={getImageUrl(v.mediaUrl)} alt="Evidence" style={{width: '100%', borderRadius: '4px', marginBottom: '5px', cursor: 'pointer'}} onClick={() => openViolationDetails(v)} onError={(e) => e.target.src = 'https://via.placeholder.com/80?text=Error'} />
                                         <strong>{v.violationType}</strong><br/>
                                         <div style={{fontSize: '0.9rem', color: '#666', margin: '5px 0'}}>{v.address || 'GPS Location'}</div>
-                                        {v.licensePlate}
+                                        {v.licensePlate && v.licensePlate !== 'null' ? v.licensePlate : 'N/A'}
+                                        <button className="btn btn-primary" style={{marginTop: '10px', width: '100%', padding: '5px'}} onClick={() => openViolationDetails(v)}>Review Violation</button>
                                     </div>
                                 </Popup>
                             </Marker>
@@ -205,7 +298,7 @@ const Dashboard = () => {
                 </div>
             )}
 
-            {/* LIST VIEW */}
+            {/* LIST VIEW (Data Table) */}
             {viewMode === 'list' && (
                 <>
                  <div className="content-header">
@@ -218,98 +311,179 @@ const Dashboard = () => {
                  {filteredViolations.length === 0 ? (
                     <div style={{ padding: '60px', textAlign: 'center', color: '#9ca3af' }}>No violations found.</div>
                  ) : (
-                    <table className="modern-table">
-                        <thead>
-                            <tr>
-                                <th style={{width: '100px'}}>Evidence</th>
-                                <th>Date</th>
-                                <th>Type</th>
-                                <th>Location</th>
-                                <th>Plate</th>
-                                <th>User</th>
-                                {currentTab === 'Pending Review' && <th>Actions</th>}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredViolations.map((v) => (
-                                <tr key={v._id}>
-                                    <td>
-                                      <a href={v.mediaUrl} target="_blank" rel="noopener noreferrer">
-                                        <img 
-                                          src={v.mediaUrl} 
-                                          alt="Evidence" 
-                                          className="violation-thumb" 
-                                          onError={(e) => e.target.src = 'https://via.placeholder.com/80?text=Error'} 
-                                        />
-                                      </a>
-                                    </td>
-                                    
-                                    <td style={{whiteSpace: 'nowrap'}}>{new Date(v.timestamp).toLocaleDateString()}</td>
-                                    
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: VIOLATION_COLORS[v.violationType] || '#ccc', flexShrink: 0 }}></div>
-                                            {v.violationType}
-                                        </div>
-                                    </td>
+                    <>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table className="modern-table">
+                                <thead>
+                                    <tr>
+                                        <th>Evidence</th>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Location</th>
+                                        <th>Plate</th>
+                                        <th>User</th>
+                                        {currentTab === 'Pending Review' && <th>Actions</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {paginatedViolations.map((v) => (
+                                        <tr key={v._id} className="clickable-row" onClick={() => openViolationDetails(v)} title="Click to view details">
+                                            <td>
+                                              <img 
+                                                src={getImageUrl(v.mediaUrl)} 
+                                                alt="Evidence" 
+                                                className="violation-thumb" 
+                                                onError={(e) => e.target.src = 'https://via.placeholder.com/80?text=Error'} 
+                                              />
+                                            </td>
+                                            
+                                            <td style={{whiteSpace: 'nowrap'}}>{new Date(v.timestamp).toLocaleDateString()}</td>
+                                            
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: VIOLATION_COLORS[v.violationType] || '#ccc', flexShrink: 0 }}></div>
+                                                    {v.violationType}
+                                                </div>
+                                            </td>
 
-                                    <td style={{maxWidth: '180px'}} title={v.address}>
-                                        <div style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#4b5563'}}>
-                                          {v.address || `${v.location?.coordinates[1].toFixed(3)}, ${v.location?.coordinates[0].toFixed(3)}`}
-                                        </div>
-                                    </td>
+                                            <td title={v.address}>
+                                                <div style={{color: '#4b5563'}}>
+                                                  {v.address || `${v.location?.coordinates[1].toFixed(3)}, ${v.location?.coordinates[0].toFixed(3)}`}
+                                                </div>
+                                            </td>
 
-                                    <td><span style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' }}>{v.licensePlate}</span></td>
+                                            <td>
+                                                <span style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
+                                                    {v.licensePlate && String(v.licensePlate).trim() !== 'null' ? v.licensePlate : 'N/A'}
+                                                </span>
+                                            </td>
+                                            
+                                            <td>
+                                                <div style={{ fontWeight: '500' }}>{v.user?.firstName} {v.user?.lastName}</div>
+                                                <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{v.user?.phoneNumber}</div>
+                                            </td>
+                                            
+                                            {currentTab === 'Pending Review' && (
+                                                <td onClick={(e) => e.stopPropagation()}> 
+                                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                                        <button onClick={() => handleStatusChange(v._id, 'Verified')} className="btn" style={{ padding: '8px', background: '#dcfce7', color: '#166534' }} title="Approve">
+                                                            <CheckCircle size={20} />
+                                                        </button>
+                                                        <button onClick={() => handleStatusChange(v._id, 'Rejected')} className="btn" style={{ padding: '8px', background: '#fee2e2', color: '#991b1b' }} title="Reject">
+                                                            <XCircle size={20} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderTop: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+                                <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredViolations.length)} of {filteredViolations.length} entries
+                                </span>
+                                
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button 
+                                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                        disabled={currentPage === 1}
+                                        style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', borderRadius: '6px', border: '1px solid #d1d5db', background: currentPage === 1 ? '#f3f4f6' : 'white', color: currentPage === 1 ? '#9ca3af' : '#374151', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: '500', transition: 'all 0.2s' }}
+                                    >
+                                        <ChevronLeft size={16} style={{marginRight: '4px'}} /> Previous
+                                    </button>
                                     
-                                    <td>
-                                        <div style={{ fontWeight: '500' }}>{v.user?.firstName} {v.user?.lastName}</div>
-                                        <div style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{v.user?.phoneNumber}</div>
-                                    </td>
+                                    <span style={{ fontSize: '0.9rem', fontWeight: '600', padding: '0 10px', color: '#11101d' }}>
+                                        Page {currentPage} of {totalPages}
+                                    </span>
                                     
-                                    {currentTab === 'Pending Review' && (
-                                        <td>
-                                            <div style={{ display: 'flex', gap: '10px' }}>
-                                                <button onClick={() => handleStatusChange(v._id, 'Verified')} className="btn" style={{ padding: '8px', background: '#dcfce7', color: '#166534' }} title="Approve">
-                                                    <CheckCircle size={20} />
-                                                </button>
-                                                <button onClick={() => handleStatusChange(v._id, 'Rejected')} className="btn" style={{ padding: '8px', background: '#fee2e2', color: '#991b1b' }} title="Reject">
-                                                    <XCircle size={20} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    )}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                    <button 
+                                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                        disabled={currentPage === totalPages}
+                                        style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', borderRadius: '6px', border: '1px solid #d1d5db', background: currentPage === totalPages ? '#f3f4f6' : 'white', color: currentPage === totalPages ? '#9ca3af' : '#374151', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontWeight: '500', transition: 'all 0.2s' }}
+                                    >
+                                        Next <ChevronRight size={16} style={{marginLeft: '4px'}} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
                  )}
                 </>
             )}
         </div>
 
-        {/* Right Column: Chart */}
-        {viewMode === 'list' && (
-            <div className="content-card">
+        {/* Analytics Chart Section (Displayed below the list view) */}
+        {viewMode === 'list' && stats && (
+            <div className="content-card" style={{ marginBottom: '40px' }}>
                 <div className="content-header">
-                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 'bold' }}>Analytics</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: '#11101d' }}>
+                        Analytics Overview: Violations by Type
+                    </h3>
                 </div>
-                <div style={{ height: '350px', padding: '1rem' }}>
-                    <ResponsiveContainer>
-                        <BarChart data={stats?.typeStats}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                            <XAxis dataKey="_id" hide />
-                            <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                            <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                            <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                                {stats?.typeStats?.map((entry, index) => <Cell key={`cell-${index}`} fill={VIOLATION_COLORS[entry._id] || '#ccc'} />)}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '10px', fontSize: '0.8rem' }}>
+                
+                <div style={{ padding: '2rem' }}>
+                    <div style={{ height: '400px', width: '100%' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart 
+                                data={stats?.typeStats} 
+                                margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+                                barSize={60}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                <XAxis 
+                                    dataKey="_id" 
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#6b7280', fontSize: 12 }}
+                                    dy={10}
+                                />
+                                <YAxis 
+                                    stroke="#9ca3af" 
+                                    fontSize={12} 
+                                    tickLine={false} 
+                                    axisLine={false} 
+                                    tickFormatter={(value) => Math.floor(value) === value ? value : ''}
+                                />
+                                <Tooltip 
+                                    cursor={{ fill: '#f8fafc' }} 
+                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} 
+                                />
+                                <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                                    {stats?.typeStats?.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={VIOLATION_COLORS[entry._id] || '#ccc'} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Chart Legend */}
+                    <div style={{ 
+                        display: 'flex', 
+                        flexWrap: 'wrap', 
+                        justifyContent: 'center', 
+                        gap: '25px', 
+                        marginTop: '30px', 
+                        padding: '15px',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '12px'
+                    }}>
                         {stats?.typeStats?.map((entry) => (
-                            <div key={entry._id} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: VIOLATION_COLORS[entry._id] || '#ccc' }}></div>
-                                <span style={{ color: '#6b7280' }}>{entry._id}</span>
+                            <div key={entry._id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ 
+                                    width: '12px', 
+                                    height: '12px', 
+                                    borderRadius: '3px', 
+                                    backgroundColor: VIOLATION_COLORS[entry._id] || '#ccc' 
+                                }}></div>
+                                <span style={{ color: '#374151', fontWeight: '600', fontSize: '0.9rem' }}>
+                                    {entry._id}: <span style={{ color: '#6b7280', fontWeight: '400' }}>{entry.count}</span>
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -318,11 +492,157 @@ const Dashboard = () => {
         )}
 
       </div>
+
+      {/* =========================================
+          MODALS SECTION
+          ========================================= */}
+
+      {/* 1. Master-Detail Review Modal */}
+      {editingViolation && (
+        <div className="modal-overlay" onClick={() => setEditingViolation(null)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', paddingBottom: '15px', marginBottom: '20px' }}>
+                    <h2 style={{margin: 0, color: '#11101d', fontSize: '1.4rem'}}>Violation Review File: {editingViolation._id.substring(0,8).toUpperCase()}</h2>
+                    <button onClick={() => setEditingViolation(null)} style={{background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280'}}>
+                        <X size={24} />
+                    </button>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
+                    
+                    {/* Left Column: Evidence Media */}
+                    <div style={{ flex: '1 1 400px' }}>
+                        <a href={getImageUrl(editingViolation.mediaUrl)} target="_blank" rel="noopener noreferrer" title="Click to open full size in new tab">
+                            <img 
+                                src={getImageUrl(editingViolation.mediaUrl)} 
+                                className="modal-image" 
+                                alt="Violation Evidence" 
+                                onError={(e) => e.target.src = 'https://via.placeholder.com/400x250?text=Image+Not+Found'}
+                            />
+                        </a>
+                        <p style={{textAlign: 'center', fontSize: '0.8rem', color: '#9ca3af', marginTop: '5px'}}>Click image to open in full resolution</p>
+                    </div>
+
+                    {/* Right Column: Violation Details & Actions */}
+                    <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column' }}>
+                        
+                        <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
+                            <h3 style={{margin: '0 0 15px 0', fontSize: '1.1rem', color: '#333'}}>Violation Details</h3>
+                            
+                            <div style={{ display: 'grid', gap: '10px', fontSize: '0.95rem' }}>
+                                <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                                    <span style={{color: '#6b7280'}}>Type:</span>
+                                    <strong style={{color: VIOLATION_COLORS[editingViolation.violationType] || '#333'}}>{editingViolation.violationType}</strong>
+                                </div>
+                                <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                                    <span style={{color: '#6b7280'}}>Date & Time:</span>
+                                    <strong>{new Date(editingViolation.timestamp).toLocaleString()}</strong>
+                                </div>
+                                <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                                    <span style={{color: '#6b7280'}}>Location:</span>
+                                    <strong style={{textAlign: 'right', maxWidth: '180px'}}>{editingViolation.address}</strong>
+                                </div>
+                                <div style={{display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e5e7eb', paddingTop: '10px', marginTop: '5px'}}>
+                                    <span style={{color: '#6b7280'}}>Reported By:</span>
+                                    <strong>{editingViolation.user?.firstName} {editingViolation.user?.lastName}</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ALPR Manual Override Input */}
+                        <div className="input-group" style={{ marginBottom: '20px' }}>
+                            <label style={{fontWeight: 'bold', display: 'block', marginBottom: '8px', color: '#11101d'}}>Manual ALPR Override (Plate Number):</label>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <input
+                                    type="text"
+                                    className="modern-input"
+                                    value={newPlate}
+                                    onChange={(e) => setNewPlate(e.target.value)}
+                                    placeholder="Enter correct plate..."
+                                    style={{ flex: 1, fontSize: '1.1rem', letterSpacing: '1px', textAlign: 'center', fontWeight: 'bold', border: '2px solid #e0e7ff' }}
+                                />
+                                <button className="btn btn-primary" onClick={handleSavePlate} style={{background: '#4f46e5', margin: 0, padding: '0 20px'}}>Save</button>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons (Only visible for Pending items) */}
+                        {editingViolation.status === 'Pending Review' && (
+                            <div style={{ display: 'flex', gap: '15px', marginTop: 'auto', paddingTop: '15px' }}>
+                                <button 
+                                    onClick={() => handleStatusChange(editingViolation._id, 'Verified')} 
+                                    className="btn" 
+                                    style={{ flex: 1, padding: '12px', background: '#22c55e', color: 'white', justifyContent: 'center', fontSize: '1rem', boxShadow: '0 4px 6px -1px rgba(34, 197, 94, 0.3)', border: 'none' }}
+                                >
+                                    <CheckCircle size={20} /> Approve
+                                </button>
+                                <button 
+                                    onClick={() => handleStatusChange(editingViolation._id, 'Rejected')} 
+                                    className="btn" 
+                                    style={{ flex: 1, padding: '12px', background: '#ef4444', color: 'white', justifyContent: 'center', fontSize: '1rem', boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.3)', border: 'none' }}
+                                >
+                                    <XCircle size={20} /> Reject
+                                </button>
+                            </div>
+                        )}
+                        
+                        {/* Status Label (For non-pending items) */}
+                        {editingViolation.status !== 'Pending Review' && (
+                             <div style={{ marginTop: 'auto', textAlign: 'center', padding: '15px', background: editingViolation.status === 'Verified' ? '#dcfce7' : '#fee2e2', borderRadius: '8px', color: editingViolation.status === 'Verified' ? '#166534' : '#991b1b', fontWeight: 'bold' }}>
+                                 This report was {editingViolation.status}
+                             </div>
+                        )}
+
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* 2. Custom Confirmation Modal */}
+      {confirmAction.isOpen && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }}>
+          <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', padding: '30px' }}>
+            <AlertTriangle 
+              size={48} 
+              color={confirmAction.newStatus === 'Verified' ? '#22c55e' : '#ef4444'} 
+              style={{ margin: '0 auto 15px' }} 
+            />
+            <h2 style={{ marginTop: 0, color: '#11101d', fontSize: '1.4rem' }}>
+              {confirmAction.newStatus === 'Verified' ? 'Approve Violation?' : 'Reject Violation?'}
+            </h2>
+            <p style={{ color: '#6b7280', marginBottom: '25px', lineHeight: '1.5' }}>
+              Are you sure you want to mark this report as <strong>{confirmAction.newStatus}</strong>? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+              <button 
+                className="btn" 
+                style={{ padding: '10px 20px', background: '#f3f4f6', color: '#4b5563', fontWeight: 'bold', border: '1px solid #e5e7eb' }} 
+                onClick={() => setConfirmAction({ isOpen: false, id: null, newStatus: '' })}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                style={{ padding: '10px 20px', background: confirmAction.newStatus === 'Verified' ? '#22c55e' : '#ef4444', color: 'white', fontWeight: 'bold', border: 'none' }} 
+                onClick={executeStatusChange}
+              >
+                Yes, {confirmAction.newStatus === 'Verified' ? 'Approve' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
-// --- Components ---
+// --- Sub-Components ---
+
+/**
+ * Renders a statistic card for the KPI banner.
+ */
 const StatCard = ({ title, value, icon, color }) => (
     <div className="stat-card" style={{ borderLeft: `5px solid ${color}` }}>
       <div>
@@ -333,6 +653,9 @@ const StatCard = ({ title, value, icon, color }) => (
     </div>
 );
 
+/**
+ * Renders a functional tab button with an optional notification badge.
+ */
 const TabButton = ({ label, count, isActive, onClick, icon }) => (
     <button onClick={onClick} style={{ padding: '8px 16px', border: 'none', background: isActive ? '#11101d' : 'transparent', color: isActive ? 'white' : '#6b7280', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '8px' }}>
         {icon} {label}
