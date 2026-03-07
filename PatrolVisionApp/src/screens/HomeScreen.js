@@ -57,17 +57,6 @@ const HomeScreen = ({ navigation }) => {
             Violations History
           </Text>
         </TouchableOpacity>
-
-        {/* Settings Button (Secondary) */}
-        <TouchableOpacity 
-          style={[styles.button, styles.secondaryButton]} 
-          onPress={onSettings}
-        >
-          <Icon name="settings" size={24} style={styles.secondaryButtonIcon} />
-          <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-            Settings
-          </Text>
-        </TouchableOpacity>
         {/* Logout Button (Secondary) */}
         <TouchableOpacity 
           style={[styles.button, styles.secondaryButton]} 
