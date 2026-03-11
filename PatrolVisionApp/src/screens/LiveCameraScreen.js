@@ -10,14 +10,14 @@ import {
   PermissionsAndroid,
   Platform,
   Alert,
-  AppState 
+  AppState
 } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import KeepAwake from 'react-native-keep-awake'
 import Geolocation from 'react-native-geolocation-service';
-
+import ImageResizer from '@bam.tech/react-native-image-resizer';
 import { analyzeTrafficFrame } from '../services/api';
 import styles from './LiveCameraScreen.styles';
 import { COLORS } from '../theme/colors';
@@ -86,14 +86,15 @@ const LiveCameraScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
 
   const cameraRef = useRef(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const lastProcessTime = useRef(0);
+  const framesBatchRef = useRef([]);
+  const isUploadingRef = useRef(false);
+  //const lastProcessTime = useRef(0);
 
   // GPS State
   const [currentLocation, setCurrentLocation] = useState(null);
   const locationRef = useRef(null);
   const [gpsStatus, setGpsStatus] = useState('searching'); // 'searching' | 'locked' | 'denied'
-  const [speed, setSpeed] = useState(0); 
+  const [speed, setSpeed] = useState(0);
 
   // Rec animation
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -118,7 +119,7 @@ const LiveCameraScreen = ({ navigation }) => {
       try {
         setIsCheckingPermission(true);
         const status = await requestPermission();
-        
+
         if (status === 'authorized' || status === 'granted' || status === true) {
           await checkLocationPermission();
         }
@@ -146,7 +147,7 @@ const LiveCameraScreen = ({ navigation }) => {
       subscription.remove();
       Geolocation.stopObserving();
     };
-  }, []); 
+  }, []);
 
   // --- GPS Permission & Tracking ---
   const checkLocationPermission = async () => {
@@ -178,7 +179,7 @@ const LiveCameraScreen = ({ navigation }) => {
           longitude: position.coords.longitude,
           accuracy: position.coords.accuracy
         };
-        setCurrentLocation({newLoc});
+        setCurrentLocation({ newLoc });
         locationRef.current = newLoc;
 
         if (position.coords.speed && position.coords.speed > 0) {
@@ -200,66 +201,103 @@ const LiveCameraScreen = ({ navigation }) => {
     );
   };
 
-  // process frame function with rate limiting
-  const processFrame = async () => {
-    const now = Date.now();
-    // Rate limiting: check if we're already processing or if the last process was less than 1 second ago
-    if (!cameraRef.current || isProcessing || (now - lastProcessTime.current < 1000)) return;
-
+  const sendBatchInBackground = async (batch) => {
+    isUploadingRef.current = true; // set flag to prevent multiple simultaneous uploads
+    console.log(`📸 [CAMERA] Assembled batch of ${batch.length} frames. Handing over to API...`);
     try {
-      setIsProcessing(true);
-      lastProcessTime.current = now;
+      const urisForApi = batch.map(item => item.compressed);
+      const result = await analyzeTrafficFrame(urisForApi);
 
-      // take photo with low quality for faster processing
-      const photo = await cameraRef.current.takePhoto({
-        qualityPrioritization: 'balanced',
-        flash: 'off'
-      });
+      if (result.success && result.data.violation) {
+          console.log("🚨 VIOLATION FOUND:", result.data.type);
+          const locationToSend = locationRef.current || { latitude: 0, longitude: 0 };
+          console.log("📍 Sending Location:", locationToSend);
+          const winningIndex = result.data.last_violation_frame ?? (batch.length - 1);
+          const bestHighQualityImageUri = batch[winningIndex].original;
 
-      // resize the image to reduce file size before sending to Flask
-      // const resized = await ImageResizer.createResizedImage(
-      //   photo.path,
-      //   1920, 
-      //   1080, 
-      //   'JPEG',
-      //   80,   
-      //   0     
-      // ); 
-      const uploadUri = 'file://' + photo.path;
-
-      // send to Flask for analysis
-      const result = await analyzeTrafficFrame(uploadUri);
-      
-
-      // if violation detected, navigate to NewViolation screen with details
-      if (result.success && result.data.violation_detected) {
-        console.log("🚨 VIOLATION FOUND:", result.data.type);
-        const locationToSend = locationRef.current || { latitude: 0, longitude: 0 };
-        console.log("📍 Sending Location:", locationToSend);
-
-        navigation.navigate('NewViolation', {
-          violationType: result.data.type,
-          plate: result.data.details?.plate,
-          imageUri: 'file://' + photo.path,
-          // sending the most recent location we have, or a default if we don't have one yet. The server can handle missing/zero coordinates if needed.
-          location: locationToSend || { latitude: 0, longitude: 0 } 
-        });
+          navigation.navigate('NewViolation', {
+            violationType: result.data.type,
+            plate: result.data.license_plate,
+            imageUri: bestHighQualityImageUri, // send the best frame as evidence
+            // sending the most recent location we have, or a default if we don't have one yet. The server can handle missing/zero coordinates if needed.
+            location: locationToSend
+          });
       }
     } catch (err) {
-      console.log("Processing Error:", err);
+      console.log("Background Upload Error:", err);
     } finally {
-      setIsProcessing(false);
+      //whether success or failure, we allow the next batch to be sent
+      isUploadingRef.current = false; 
     }
   };
 
-  // take a frame every second and process it
-  useEffect(() => {
-    const interval = setInterval(() => {
-      processFrame();
-    }, 1000);
+  
+  // process frame function with rate limiting
+  const processFrame = async () => {
+    if (!cameraRef.current ) return;
 
-    return () => clearInterval(interval);
-  }, [isProcessing, currentLocation]); 
+    try {
+
+      // take photo with low quality for faster processing
+      const photo = await cameraRef.current.takeSnapshot({
+        quality: 85
+      });
+      const originalUri = 'file://' + photo.path;
+
+      // //resize the image to reduce file size before sending to server
+      // const resized = await ImageResizer.createResizedImage(
+      //   photo.path,
+      //   1024, 
+      //   768, 
+      //   'JPEG',
+      //   80,   
+      //   90     
+      // ); 
+      const compressedUri = 'file://' + photo.path;
+      framesBatchRef.current.push({
+        original: originalUri,
+        compressed: compressedUri  });
+      if (framesBatchRef.current.length > 3) {
+        framesBatchRef.current.shift();
+      } 
+      //send batch of frames every 1 seconds when we have 3 frames
+      if (framesBatchRef.current.length === 3 && !isUploadingRef.current) {
+        const batchToSend = [...framesBatchRef.current];
+        sendBatchInBackground(batchToSend);
+      }
+    } catch (err) {
+      console.log("Camera Capture Error:", err);
+    }
+  };
+
+  // take a frame continuously, waiting for the previous to finish
+  useEffect(() => {
+    let isMounted = true;
+
+    const captureLoop = async () => {
+      if (!isMounted) return;
+      
+      const startTime = Date.now();
+      
+      await processFrame(); 
+      
+      const elapsed = Date.now() - startTime;
+      // Aim for approximately 3 frames per second, but adjust based on processing time
+      const delay = Math.max(50, 333 - elapsed); 
+      
+      if (isMounted) {
+        setTimeout(captureLoop, delay);
+      }
+    };
+
+    console.log("🟢 [INIT] Starting the smart camera loop...");
+    captureLoop();
+
+    return () => {
+        console.log("🔴 [CLEANUP] Stopping the camera loop.");
+        isMounted = false;
+    };
+  }, []);
 
   // handle end trip - stop GPS tracking and go back
   const handleEndTrip = () => {
@@ -283,17 +321,17 @@ const LiveCameraScreen = ({ navigation }) => {
       </View>
     );
   }
-  
+
   if (!hasPermission) return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{color: 'white'}}>No Camera Permission</Text>
-      </View>
+    <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <Text style={{ color: 'white' }}>No Camera Permission</Text>
+    </View>
   );
-  
+
   if (device == null) return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{color: 'white'}}>No Camera Device Found</Text>
-      </View>
+    <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <Text style={{ color: 'white' }}>No Camera Device Found</Text>
+    </View>
   );
 
   return (
@@ -327,7 +365,7 @@ const LiveCameraScreen = ({ navigation }) => {
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
         <SwipeButton onSwipeSuccess={handleEndTrip} />
       </View>
-      <KeepAwake /> 
+      <KeepAwake />
     </View>
   );
 };
