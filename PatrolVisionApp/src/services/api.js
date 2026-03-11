@@ -2,9 +2,9 @@
 import axios from 'axios';
 
 // ⚠️ IMPORTANT: Ensure this IP matches your computer's IP via 'ipconfig'
-export const SERVER_URL = 'http://192.168.1.50:5000'; 
-const BASE_URL = ' http://192.168.1.50:5000/api'; 
-const FLASK_URL = 'http://192.168.1.50:6000/analyze';
+export const SERVER_URL = 'http://192.168.1.57:5000'; 
+const BASE_URL = 'http://192.168.1.57:5000/api'; 
+const FASTAPI_URL = 'https://idohaver7-patrolvision.hf.space/analyze_batch';
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -71,24 +71,31 @@ export const fetchViolations = async (token, params = {}) => {
   }
 };
 // --- Traffic Enforcement Services ---
-export const analyzeTrafficFrame = async (imageUri) => {
+export const analyzeTrafficFrame = async (imageUris) => {
   try {
+    console.log(`\n📤 [API] Preparing to send batch of ${imageUris.length} frames...`);
+    console.log(`🔗 [API] Target URL: ${FASTAPI_URL}`);
     const formData = new FormData();
-    formData.append('frame', {
-      uri: imageUri,
-      type: 'image/jpeg',
-      name: 'frame.jpg',
+    imageUris.forEach((uri, index) => {
+      formData.append('files', {
+        uri: uri,
+        type: 'image/jpeg',
+        name: 'frame_${index}.jpg',
+      });
     });
 
-    //Sending to Flask server for analysis
-    const response = await axios.post(FLASK_URL, formData, {
+    console.log("🚀 [API] Sending POST request to server NOW...");
+    //Sending to FastAPI server for analysis
+    const response = await axios.post(FASTAPI_URL, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 3000, // Timeout 
+      timeout: 10000, // Timeout 
     });
-
+    console.log("✅ [API] Server responded with status:", response.status);
+    console.log("📦 [API] Server data:", response.data);
     return { success: true, data: response.data };
   } catch (error) {
-    console.log("Flask Error:", error.message);
+    console.error("❌ [API] Request FAILED:", error.message);
+    console.log("FastAPI Error:", error.message);
     return { success: false, error: error.message };
   }
 };

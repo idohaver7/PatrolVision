@@ -15,7 +15,7 @@ CORS(app)
 LANE_SIDE = 'right'      
 MIN_VEHICLE_AREA = 4000  
 MAX_LANE_DIST = 500      
-RED_LIGHT_TOLERANCE = 30
+RED_LIGHT_TOLERANCE = 0.04
 
 # --- LOAD MODELS ---
 try:
@@ -36,12 +36,6 @@ def get_center(box):
     cx = (box[0] + box[2]) / 2
     cy = (box[1] + box[3]) / 2
     return cx, cy
-
-def is_center_inside(center, target_box):
-    cx, cy = center
-    tx1, ty1, tx2, ty2 = target_box
-    return (tx1 < cx < tx2) and (ty1 < cy < ty2)
-
 def calculate_intersection_ratio(box1, box2):
     """
     Calculates the intersection area ratio between two bounding boxes.
@@ -87,7 +81,7 @@ def read_license_plate(img, plate_box):
     cv2.imwrite(debug_path, plate_img)
     
     try:
-        results = reader.readtext(plate_img, detail=0, paragraph=False)
+        results = reader.readtext(plate_img, detail=0, paragraph=False,allowlist='0123456789')
         full_text = "".join(results)
         print(f"DEBUG OCR Raw text: {full_text}") # Check what EasyOCR actually saw
         clean_number = re.sub(r'[^0-9]', '', full_text)
@@ -136,13 +130,15 @@ def find_active_red_lines(stop_lines, red_lights, green_lights, img_height):
                 
     return active_lines
 
-def check_red_light_violation(vehicle, active_red_lines):
+def check_red_light_violation(vehicle, active_red_lines, img_height):
     """
     Checks if a vehicle has crossed an active red stop line.
     """
     vx1, vy1, vx2, vy2 = vehicle
     v_bottom = vy2 
     v_center_x = (vx1 + vx2) / 2
+    
+    tolerance= img_height * RED_LIGHT_TOLERANCE
 
     for line in active_red_lines:
         lx1, ly1, lx2, ly2 = line
@@ -152,12 +148,23 @@ def check_red_light_violation(vehicle, active_red_lines):
         # Ensure the vehicle is horizontally aligned with the stop line lane
         if not (l_min_x - 20 < v_center_x < l_max_x + 20):
             continue
+        # Ensure the vehicle is vertically close enough to the line to be relevant and not a distant object
+        if abs(v_bottom - l_center_y) > (img_height * 0.3):
+            continue
 
         # Calculate vertical distance past the line (assuming perspective where lower Y means farther)
         distance_past_line = l_center_y - v_bottom 
+        if distance_past_line > 0:
+            print(f"🔍 Vehicle is physically PAST the line (Distance > 0)")
+        else:
+            print(f"⚪ Vehicle is still BEFORE the line (Distance <= 0)")
 
-        if distance_past_line > RED_LIGHT_TOLERANCE:
+        if distance_past_line > tolerance:
+            print(f"⚠️ VIOLATION CONFIRMED: {int(distance_past_line)} > {int(tolerance)}")
             return True, line
+        else:
+            print(f"✅ NO VIOLATION: Distance is within tolerance.")
+        
             
     return False, None
 
@@ -310,6 +317,25 @@ def analyze_frame():
                 if condition_touching or condition_left_side:
                     violation_detected = True
                     violation_type = "Illegal Overtaking"
+                      #דיבוג------------------------------------------
+                    try:
+                        vx1, vy1, vx2, vy2 = map(int, vehicle)
+                        
+                        # חיתוך הרכב מהתמונה המקורית
+                        # הרחבת השטח ב-20 פיקסלים כדי לראות את ההקשר
+                        v_crop = img[max(0, vy1-20):min(height, vy2+20), max(0, vx1-20):min(width, vx2+20)].copy()
+                        
+                        # ציור הריבוע של ה-YOLO על הרכב המכריע
+                        # כדי שנראה איזה ריבוע שימש לחישוב
+                        cv2.rectangle(v_crop, (20, 20), (v_crop.shape[1]-20, v_crop.shape[0]-20), (0, 0, 255), 3)
+                        
+                        # שמירת קובץ הדיבאג
+                        debug_vehicle_path = "vehicle_debug.jpg"
+                        cv2.imwrite(debug_vehicle_path, v_crop)
+                        print(f"🕵️ Saved violation vehicle debug image to: {debug_vehicle_path}")
+                    except Exception as e:
+                        print(f"❌ Failed to save debug image: {e}")
+                    # ----------------------------------------------------
                     plate_num = find_plate_text_for_vehicle(vehicle)
                     violation_data = {"box": vehicle, "plate": plate_num}
                     break
@@ -359,11 +385,30 @@ def analyze_frame():
         if len(active_lines) > 0:
             for vehicle in all_vehicles:
                 # Check if the vehicle crossed any of the active red lines
-                is_violation, line_crossed = check_red_light_violation(vehicle, active_lines)
+                is_violation, line_crossed = check_red_light_violation(vehicle, active_lines, height)
                 
                 if is_violation:
                     violation_detected = True
                     violation_type = "Red Light Violation"
+                    #דיבוג------------------------------------------
+                    try:
+                        vx1, vy1, vx2, vy2 = map(int, vehicle)
+                        
+                        # חיתוך הרכב מהתמונה המקורית
+                        # הרחבת השטח ב-20 פיקסלים כדי לראות את ההקשר
+                        v_crop = img[max(0, vy1-20):min(height, vy2+20), max(0, vx1-20):min(width, vx2+20)].copy()
+                        
+                        # ציור הריבוע של ה-YOLO על הרכב המכריע
+                        # כדי שנראה איזה ריבוע שימש לחישוב
+                        cv2.rectangle(v_crop, (20, 20), (v_crop.shape[1]-20, v_crop.shape[0]-20), (0, 0, 255), 3)
+                        
+                        # שמירת קובץ הדיבאג
+                        debug_vehicle_path = "vehicle_debug.jpg"
+                        cv2.imwrite(debug_vehicle_path, v_crop)
+                        print(f"🕵️ Saved violation vehicle debug image to: {debug_vehicle_path}")
+                    except Exception as e:
+                        print(f"❌ Failed to save debug image: {e}")
+                    # ----------------------------------------------------
                     plate_num = find_plate_text_for_vehicle(vehicle)
                     violation_data = {"box": vehicle, "plate": plate_num, "line": line_crossed}
                     break
