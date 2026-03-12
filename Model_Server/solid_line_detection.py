@@ -1,18 +1,20 @@
+#--- 🕵️ SOLID LINE CROSSING DETECTION LOGIC ---
 import numpy as np
 import time
 from utils import get_center_bottom, get_box_area, get_unified_line_x, extract_license_plate
-area_threshold = 1.2
-y_movement_threshold = 15
-passing_distance_threshold = 0.2
+AREA_THRESHOLD = 1.2
+Y_MOVEMENT_THRESHOLD = 15
+PASSING_DISTANCE_THRESHOLD = 0.2
+CLEANING_TIME_SECONDS = 60  
 reported_violators = {}  # To keep track of already reported violations and avoid duplicates
 #solid line crossing violation detection logic:
 def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
     print("\n--- 🕵️ DEBUG: STARTING SOLID LINE LOGIC ---")
     #collect the history of each tracked vehicle across the frames
-    vehicle_history = {}
+    vehicle_history = {} # Id History
     current_time = time.time()
     #clan up repored violators that were reported more than 1 minutes ago
-    keys_to_remove = [k for k, v in reported_violators.items() if current_time - v > 60]
+    keys_to_remove = [k for k, v in reported_violators.items() if current_time - v > CLEANING_TIME_SECONDS]
     for k in keys_to_remove:
         del reported_violators[k]
         
@@ -27,7 +29,7 @@ def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
         ]
         
         for det in frame_data["detections"]:
-            if det["type"] == "box" and det.get("track_id", -1) != -1:
+            if (det["class_name"] == "car" or det["class_name"] == "bus" or det["class_name"] == "truck") and det.get("track_id", -1) != -1:
                 track_id = det["track_id"]
                 
                 if track_id not in vehicle_history:
@@ -61,7 +63,7 @@ def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
 
         print(f"   📏 Movement: dY={y_movement:.2f}, Area Growth={area_growth:.2f}")
     
-        if y_movement > y_movement_threshold and area_growth > area_threshold:
+        if y_movement > Y_MOVEMENT_THRESHOLD and area_growth > AREA_THRESHOLD:
             print("   ⛔ Skipped: Identified as oncoming traffic (Counter-flow).")
             continue 
             
@@ -83,7 +85,7 @@ def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
             total_frames_checked += 1
             
             # if the vechiele is left to the line its violation
-            if car_x + passing_distance_threshold < exact_line_x:
+            if car_x + PASSING_DISTANCE_THRESHOLD < exact_line_x:
                 print("      🚨 CROSSING DETECTED IN THIS FRAME!")
                 violation_count += 1
                 last_frame_idx = i

@@ -8,6 +8,7 @@ import io
 from PIL import Image,ImageOps
 from ultralytics import YOLO
 from solid_line_detection import detect_solid_line_violation
+from bus_lane_detection import detect_bus_line_violation
 from fastapi.responses import FileResponse
 import os
 
@@ -20,7 +21,6 @@ ocr_reader = easyocr.Reader(['en'])  # Initialize EasyOCR reader for English
 #------CONFIGURATION-------
 POLYGON_CLASS_NAMES = {"solid_line", "bus line", "stop_line"}
 BOX_CLASS_NAMES = {"car", "bus", "truck", "traffic_light_red", "traffic_light_green", "taxi_hat", "license_plate"}
-
 @app.get("/")
 async def root():
     print("🟢 Someone pinged the root URL!")
@@ -98,11 +98,34 @@ async def analyze_sequence(files: List[UploadFile] = File(...)):
                 
         
         batch_analysis.append(frame_data)
-    # After analyzing all frames, we can run the violation detection logic
-    print("🧠 Running solid line logic...")
-    violation_result = detect_solid_line_violation(batch_analysis,frames,ocr_reader)
+    has_solid_line = False
+    has_bus_line = False
+    for frame_data in batch_analysis:
+            if has_solid_line and has_bus_line:
+                break
+                
+            for det in frame_data["detections"]:
+                class_name = det["class_name"]
+                if class_name == "solid_line":
+                    has_solid_line = True
+                elif class_name == "bus line":
+                    has_bus_line = True    
+    if has_solid_line:
+        print("✔️ Pre-check passed: Solid line found. Running solid line logic...")
+        violation_result = detect_solid_line_violation(batch_analysis,frames,ocr_reader)
+        if violation_result.get("violation"):
+            return violation_result
+    else:
+            print("⏩ Pre-check skipped: No solid line in batch.")
+    if has_bus_line:
+        print("✔️ Pre-check passed: Bus line found. Running bus lane logic...")
+        violation_result = detect_bus_line_violation(batch_analysis, frames, ocr_reader)
+        if violation_result.get("violation"):
+            return violation_result
+    else:
+            print("⏩ Pre-check skipped: No bus line in batch.")
     print("✅ Finished processing! Sending response back to phone.")
-    return violation_result
+    return {"violation": False}
         
    
 if __name__ == "__main__":

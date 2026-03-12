@@ -2,8 +2,8 @@
 import axios from 'axios';
 
 // ⚠️ IMPORTANT: Ensure this IP matches your computer's IP via 'ipconfig'
-export const SERVER_URL = 'http://192.168.1.57:5000'; 
-const BASE_URL = 'http://192.168.1.57:5000/api'; 
+export const SERVER_URL = 'http://192.168.1.59:5000'; 
+const BASE_URL = 'http://192.168.1.59:5000/api'; 
 const FASTAPI_URL = 'https://idohaver7-patrolvision.hf.space/analyze_batch';
 
 const api = axios.create({
