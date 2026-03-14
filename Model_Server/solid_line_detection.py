@@ -1,7 +1,7 @@
 #--- 🕵️ SOLID LINE CROSSING DETECTION LOGIC ---
 import numpy as np
 import time
-from utils import get_center_bottom, get_box_area, get_unified_line_x, extract_license_plate
+from utils import get_center_bottom, get_box_area, get_unified_line_x, extract_license_plate,is_far
 AREA_THRESHOLD = 1.2
 Y_MOVEMENT_THRESHOLD = 15
 PASSING_DISTANCE_THRESHOLD = 0.2
@@ -29,7 +29,7 @@ def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
         ]
         
         for det in frame_data["detections"]:
-            if (det["class_name"] == "car" or det["class_name"] == "bus" or det["class_name"] == "truck") and det.get("track_id", -1) != -1:
+            if (det["class_name"] == "car" or det["class_name"] == "bus" or det["class_name"] == "truck") and det.get("track_id", -1) != -1 and not is_far(det):
                 track_id = det["track_id"]
                 
                 if track_id not in vehicle_history:
@@ -42,7 +42,7 @@ def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
     #analayze the history of each vechicle to detect violations
     for track_id, history in vehicle_history.items():
         print(f"\n🔍 Checking Vehicle ID: {track_id} (Appeared in {len(history['frames'])} frames)")
-        # we ignore vehicles that appear in less than 2 frames since we can't determine movement direction
+        # we ignore vehicles that appear in 1 frames since we can't determine movement direction
         if len(history["frames"]) < 2:
             print("   ⏩ Skipped: Vehicle appeared in less than 2 frames (Tracker lost it).")
             continue
@@ -75,6 +75,7 @@ def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
         for i in range(len(history["frames"])):
             current_coords = history["coords"][i]
             current_lines = history["lines"][i]
+            total_frames_checked += 1
             
             if not current_lines:
                 print(f"   ⚠️ Frame {history['frames'][i]}: No solid line found to compare against.")
@@ -82,8 +83,9 @@ def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
                 
             car_x, car_y = get_center_bottom(current_coords)
             exact_line_x = get_unified_line_x(current_lines, car_y)
-            total_frames_checked += 1
-            
+            if exact_line_x is None:
+                print(f"   ⚠️ Frame {history['frames'][i]}: Car is beyond the farthest detected line. Skipping this frame for violation check.")
+                continue
             # if the vechiele is left to the line its violation
             if car_x + PASSING_DISTANCE_THRESHOLD < exact_line_x:
                 print("      🚨 CROSSING DETECTED IN THIS FRAME!")

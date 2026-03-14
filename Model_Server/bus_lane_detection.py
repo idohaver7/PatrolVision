@@ -1,7 +1,7 @@
 # --- 🚌 BUS LANE DETECTION LOGIC ---
 import numpy as np
 import time
-from utils import get_unified_line_x, extract_license_plate, get_center_bottom
+from utils import get_unified_line_x, extract_license_plate, get_center_bottom,is_far
 CLEANING_TIME_SECONDS = 60
 CAR_HEIGHT_THRESHOLD = 0.2  # Minimum height in pixels to consider a detection as a car (to filter out small objects and false positives)
 #Memory to avoid reporting the same vehicle multiple times
@@ -49,7 +49,7 @@ def detect_bus_line_violation(batch_analysis, frames, ocr_reader):
             if det["class_name"] == "taxi_hat" and det["type"] == "box"
         ]
         for det in frame_data["detections"]:
-            if (det["class_name"] == "car" or det["class_name"] == "truck") and det.get("track_id", -1) != -1:
+            if (det["class_name"] == "car" or det["class_name"] == "truck") and det.get("track_id", -1) != -1 and not is_far(det):
                 track_id = det["track_id"]
                 car_coords = det["coordinates"]
                 has_hat_in_this_frame = is_taxi(car_coords, taxi_hats)
@@ -73,7 +73,7 @@ def detect_bus_line_violation(batch_analysis, frames, ocr_reader):
         print(f"\n🔍 Checking Vehicle ID: {track_id} (Appeared in {len(history['frames'])} frames)")
         # Run all over the frames of this vehicle
         for frame_idx, coords, bus_lines, dashed_lines in zip(history["frames"], history["coords"], history["bus_lines"], history["dashed_lines"]):
-            
+            total_frames_checked += 1
             # if there are no bus lines in this frame, we can't check for violation, so we skip it
             if len(bus_lines) == 0:
                 continue    
@@ -84,9 +84,8 @@ def detect_bus_line_violation(batch_analysis, frames, ocr_reader):
             #we find the x coordinate of the bus lane line at the height of the car
             bus_line_x = get_unified_line_x(bus_lines, car_bottom_y)
             if bus_line_x is None:
+                print(f"   ⚠️ Frame {frame_idx}: Car is beyond the farthest detected bus line. Skipping this frame for violation check.")
                 continue
-                
-            total_frames_checked += 1
             
             
             bus_lane_side = "right" # default assumption

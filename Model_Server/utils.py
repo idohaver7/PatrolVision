@@ -1,6 +1,9 @@
 import numpy as np
 # Utility functions for analyzing the batch of frames
-
+def is_far(car, threshold=80):
+    coords=car["coordinates"]
+    car_height = coords[3] - coords[1]
+    return car_height <= threshold
 
 def get_center_bottom(box_coords):    
     x1, y1, x2, y2 = box_coords
@@ -30,9 +33,13 @@ def get_unified_line_x(lines_polygons, car_y):
     
     # fit a 2nd degree polynomial (quadratic curve) to the points to get a smooth line representation
     curve_coefficients = np.polyfit(all_y, all_x, 2)
-    
+    #if the car is farest then the farest detected line we ignored
+    min_line_y = min([point[1] for poly in lines_polygons for point in poly])
+    if car_y < min_line_y:
+        return None
     # use the fitted curve to calculate the X position of the line at the target Y
     exact_line_x = np.polyval(curve_coefficients, car_y)
+    
     
     return exact_line_x
     
