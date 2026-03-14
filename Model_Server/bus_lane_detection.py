@@ -3,9 +3,11 @@ import numpy as np
 import time
 from utils import get_unified_line_x, extract_license_plate, get_center_bottom,is_far
 CLEANING_TIME_SECONDS = 60
+CLEANING_TIME_SECONDS_TAXI = 600
 CAR_HEIGHT_THRESHOLD = 0.2  # Minimum height in pixels to consider a detection as a car (to filter out small objects and false positives)
 #Memory to avoid reporting the same vehicle multiple times
 reported_violators = {} 
+known_taxis = {}
 def is_taxi(car_coords, taxi_hats):
     cx1, cy1, cx2, cy2 = car_coords
     car_height = cy2 - cy1
@@ -30,6 +32,9 @@ def detect_bus_line_violation(batch_analysis, frames, ocr_reader):
     keys_to_remove = [k for k, v in reported_violators.items() if current_time - v > CLEANING_TIME_SECONDS]
     for k in keys_to_remove:
         del reported_violators[k]
+    taxi_keys_to_remove = [k for k, v in known_taxis.items() if current_time - v > CLEANING_TIME_SECONDS_TAXI]
+    for k in taxi_keys_to_remove:
+        del known_taxis[k]
    
 
     # catch the history of each tracked vehicle across the frames
@@ -53,23 +58,26 @@ def detect_bus_line_violation(batch_analysis, frames, ocr_reader):
                 track_id = det["track_id"]
                 car_coords = det["coordinates"]
                 has_hat_in_this_frame = is_taxi(car_coords, taxi_hats)
+                
+                if has_hat_in_this_frame:
+                    known_taxis[track_id] = current_time  # Remember this ID as a taxi for future frames
             
                 if track_id not in vehicle_history:
-                    vehicle_history[track_id] = {"frames": [], "coords": [], "dashed_lines": [], "bus_lines": [],"taxi_hat_count":0}
+                    vehicle_history[track_id] = {"frames": [], "coords": [], "dashed_lines": [], "bus_lines": []}
                 vehicle_history[track_id]["frames"].append(frame_idx)
                 vehicle_history[track_id]["coords"].append(car_coords)
                 vehicle_history[track_id]["dashed_lines"].append(dashed_lines)
                 vehicle_history[track_id]["bus_lines"].append(bus_lines)
-                if has_hat_in_this_frame:
-                    vehicle_history[track_id]["taxi_hat_count"] += 1
     print(f"🚗 Found {len(vehicle_history)} unique tracked vehicles (with IDs).")       
     # analyze the history of each vehicle to detect violations
     for track_id, history in vehicle_history.items():
-        if history["taxi_hat_count"] > 0:
-            print(f"\n🚕 Vehicle ID {track_id} has taxi hat in {history['taxi_hat_count']} frames. Skipping bus lane violation check for this vehicle.")
+        if track_id in known_taxis:
+            print(f"   🚕 SKIP: Vehicle ID {track_id} identified as a taxi (detected hat).")
+            known_taxis[track_id] = current_time  # Update the timestamp to extend the memory
             continue
         violation_count = 0
         total_frames_checked = 0
+        last_frame_idx = None
         print(f"\n🔍 Checking Vehicle ID: {track_id} (Appeared in {len(history['frames'])} frames)")
         # Run all over the frames of this vehicle
         for frame_idx, coords, bus_lines, dashed_lines in zip(history["frames"], history["coords"], history["bus_lines"], history["dashed_lines"]):

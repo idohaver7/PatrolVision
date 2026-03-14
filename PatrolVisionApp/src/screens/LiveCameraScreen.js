@@ -259,12 +259,12 @@ const LiveCameraScreen = ({ navigation }) => {
       framesBatchRef.current.push({
         original: originalUri,
         compressed: compressedUri  });
-      if (framesBatchRef.current.length === FRAMES_BATCH_SIZE && !isUploadingRef.current) {
+      if (framesBatchRef.current.length >= FRAMES_BATCH_SIZE && !isUploadingRef.current) {
         const batchToSend = [...framesBatchRef.current];
         framesBatchRef.current = []; // clear the batch immediately
         sendBatchInBackground(batchToSend);
       }
-      else if (framesBatchRef.current.length > FRAMES_BATCH_SIZE) {
+      else if (framesBatchRef.current.length >= FRAMES_BATCH_SIZE) {
         framesBatchRef.current.shift();
       } 
     } catch (err) {
