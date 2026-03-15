@@ -22,6 +22,8 @@ import { analyzeTrafficFrame } from '../services/api';
 import styles from './LiveCameraScreen.styles';
 import { COLORS } from '../theme/colors';
 
+FRAMES_BATCH_SIZE = 4; // number of frames to send in each batch to the server
+
 //swipe button component
 const SwipeButton = ({ onSwipeSuccess }) => {
   const [dragX] = useState(new Animated.Value(0));
@@ -257,14 +259,14 @@ const LiveCameraScreen = ({ navigation }) => {
       framesBatchRef.current.push({
         original: originalUri,
         compressed: compressedUri  });
-      if (framesBatchRef.current.length > 3) {
-        framesBatchRef.current.shift();
-      } 
-      //send batch of frames every 1 seconds when we have 3 frames
-      if (framesBatchRef.current.length === 3 && !isUploadingRef.current) {
+      if (framesBatchRef.current.length >= FRAMES_BATCH_SIZE && !isUploadingRef.current) {
         const batchToSend = [...framesBatchRef.current];
+        framesBatchRef.current = []; // clear the batch immediately
         sendBatchInBackground(batchToSend);
       }
+      else if (framesBatchRef.current.length >= FRAMES_BATCH_SIZE) {
+        framesBatchRef.current.shift();
+      } 
     } catch (err) {
       console.log("Camera Capture Error:", err);
     }
@@ -282,8 +284,8 @@ const LiveCameraScreen = ({ navigation }) => {
       await processFrame(); 
       
       const elapsed = Date.now() - startTime;
-      // Aim for approximately 3 frames per second, but adjust based on processing time
-      const delay = Math.max(50, 333 - elapsed); 
+      // Aim for approximately 6 frames per second, but adjust based on processing time
+      const delay = Math.max(50, 166 - elapsed); 
       
       if (isMounted) {
         setTimeout(captureLoop, delay);
