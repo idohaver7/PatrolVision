@@ -44,7 +44,7 @@ def get_unified_line_x(lines_polygons, car_y):
     return exact_line_x
     
 #Pass all the history and extract the license plate with the best confidence score.
-def extract_license_plate(history, batch_analysis, frames,ocr_reader):
+def extract_license_plate(history, batch_analysis, frames, lpr_model):
   best_conf = -1.0
   best_crop = None  
   for i in range(len(history["frames"])):
@@ -61,14 +61,36 @@ def extract_license_plate(history, batch_analysis, frames,ocr_reader):
                     if conf > best_conf:
                         best_conf = conf
                         best_crop = frames[frame_idx][py1:py2, px1:px2]
-  if best_crop is not None:
-        #gray_crop = cv2.cvtColor(best_crop, cv2.COLOR_BGR2GRAY)
-        ocr_results = ocr_reader.readtext(best_crop,allowlist='0123456789')
-        plate_text = "".join([res[1] for res in ocr_results])
-        clean_text = ''.join(filter(str.isdigit, plate_text))
-        if clean_text and len(clean_text) in [7,8]:  # Assuming license plates have 7 or 8 digits
-            return clean_text 
-        else:
-            return 'Unknown'  # OCR failed to extract a valid plate number
-        
-  return None    
+  if best_crop is not None and best_crop.size > 0:
+        try:
+            # Run our custom trained YOLO model on the cropped plate
+            results = lpr_model(best_crop, verbose=False)
+            
+            if len(results) > 0 and len(results[0].boxes) > 0:
+                boxes = results[0].boxes
+                detections = []
+                
+                # Extract each digit and its X-center coordinate
+                for box in boxes:
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+                    cls_id = int(box.cls[0].item())
+                    char_name = lpr_model.names[cls_id]
+                    
+                    detections.append({
+                        "char": char_name,
+                        "x_center": (x1 + x2) / 2.0
+                    })
+                    
+                #  Sort digits from left to right based on their X position!
+                detections = sorted(detections, key=lambda d: d["x_center"])
+                plate_text = "".join([str(d["char"]) for d in detections])
+                
+                # Clean the text to keep only digits
+                clean_text = ''.join(filter(str.isdigit, plate_text))
+                
+                if clean_text and len(clean_text) in [7, 8]:  # Assuming license plates have 7 or 8 digits
+                    return clean_text 
+        except Exception as e:
+            print(f"LPR Model Error: {e}")
+            
+        return 'Unknown'  # Failed to extract a valid plate number

@@ -2,7 +2,6 @@ from fastapi import FastAPI, File, UploadFile
 from typing import List
 import uvicorn
 import numpy as np
-import easyocr
 import cv2
 import io
 from PIL import Image,ImageOps
@@ -16,7 +15,7 @@ app = FastAPI()
 
 # Our YOLO-Segmentation model
 model = YOLO('traffic_model.pt') 
-ocr_reader = easyocr.Reader(['en'])  # Initialize EasyOCR reader for English
+lpr_model = YOLO('lpr_model.pt')  # Initialize YOLO model for license plate recognition
 
 #------CONFIGURATION-------
 POLYGON_CLASS_NAMES = {"solid_line", "bus line", "stop_line"}
@@ -52,10 +51,14 @@ async def analyze_sequence(files: List[UploadFile] = File(...)):
     if len(results) > 0:
         annotated_frames = []
         for res in results:
+             annotated_frames.append(res.plot())
 #-------------DEBUGGING------------------
-            annotated_frames.append(res.plot())
-        combined_image = cv2.hconcat(annotated_frames)
-        cv2.imwrite("debug_vision.jpg", combined_image)
+        valid_frames = [f for f in annotated_frames if f is not None and f.size > 0]
+        if len(valid_frames) > 0:
+            target_height, target_width = valid_frames[0].shape[:2]
+            resized_frames = [cv2.resize(f, (target_width, target_height)) if f.shape[:2] != (target_height, target_width) else f for f in valid_frames]
+            combined_image = cv2.hconcat(resized_frames)
+            cv2.imwrite("debug_vision.jpg", combined_image)
 #-----------------------------------------------------------
     
     batch_analysis = []
@@ -112,14 +115,14 @@ async def analyze_sequence(files: List[UploadFile] = File(...)):
                     has_bus_line = True    
     if has_solid_line:
         print("✔️ Pre-check passed: Solid line found. Running solid line logic...")
-        violation_result = detect_solid_line_violation(batch_analysis,frames,ocr_reader)
+        violation_result = detect_solid_line_violation(batch_analysis,frames,lpr_model)
         if violation_result.get("violation"):
             return violation_result
     else:
             print("⏩ Pre-check skipped: No solid line in batch.")
     if has_bus_line:
         print("✔️ Pre-check passed: Bus line found. Running bus lane logic...")
-        violation_result = detect_bus_line_violation(batch_analysis, frames, ocr_reader)
+        violation_result = detect_bus_line_violation(batch_analysis, frames, lpr_model)
         if violation_result.get("violation"):
             return violation_result
     else:
