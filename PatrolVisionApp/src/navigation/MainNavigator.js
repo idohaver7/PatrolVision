@@ -8,7 +8,7 @@ import ViolationsHistoryScreen from '../screens/ViolationsHistoryScreen';
 import ViolationDetailScreen from '../screens/ViolationDetailScreen';
 import LiveCameraScreen from '../screens/LiveCameraScreen';
 import NewViolationScreen from '../screens/NewViolationScreen';
-
+import VideoAnalaysisScreen from '../screens/VideoAnalysisScreen';
 const Stack = createNativeStackNavigator();
 
 const MainNavigator = () => {
@@ -34,6 +34,11 @@ const MainNavigator = () => {
         component={HomeScreen}
         //  We hide the header for the main home screen
         options={{ headerShown: false }} 
+      />
+      <Stack.Screen 
+        name="VideoAnalysis"
+        component={VideoAnalaysisScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="LiveCamera"

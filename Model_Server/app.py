@@ -63,6 +63,8 @@ async def analyze_sequence(files: List[UploadFile] = File(...)):
     
     batch_analysis = []
     
+    image_height = frames[0].shape[0] if frames else 512
+
     # analyze each frame's results
     for i, result in enumerate(results):
         frame_data = {
@@ -115,14 +117,14 @@ async def analyze_sequence(files: List[UploadFile] = File(...)):
                     has_bus_line = True    
     if has_solid_line:
         print("✔️ Pre-check passed: Solid line found. Running solid line logic...")
-        violation_result = detect_solid_line_violation(batch_analysis,frames,lpr_model)
+        violation_result = detect_solid_line_violation(batch_analysis, frames, lpr_model, image_height)
         if violation_result.get("violation"):
             return violation_result
     else:
             print("⏩ Pre-check skipped: No solid line in batch.")
     if has_bus_line:
         print("✔️ Pre-check passed: Bus line found. Running bus lane logic...")
-        violation_result = detect_bus_line_violation(batch_analysis, frames, lpr_model)
+        violation_result = detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height)
         if violation_result.get("violation"):
             return violation_result
     else:
