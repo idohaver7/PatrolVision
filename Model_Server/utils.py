@@ -44,75 +44,87 @@ def get_unified_line_x(lines_polygons, car_y):
     
     return exact_line_x
     
-#Pass all the history and extract the license plate with the best confidence score.
+#Extracts the license plate from the original high-resolution frame
 def extract_license_plate(history, batch_analysis, frames, lpr_model):
-  print(f"\n🪪 [LPR] Starting extraction — {len(history['frames'])} history frames")
-  best_conf = -1.0
-  best_crop = None
-  for i in range(len(history["frames"])):
-        frame_idx = history["frames"][i]
-        vehicle_coords = history["coords"][i]
-        vx1, vy1, vx2, vy2 = map(int, vehicle_coords)
-        all_detections = batch_analysis[frame_idx]["detections"]
-        plate_dets_in_frame = [d for d in all_detections if d["class_name"] == "license_plate"]
-        print(f"   Frame {frame_idx}: vehicle=({vx1},{vy1},{vx2},{vy2}) | plate detections={len(plate_dets_in_frame)}")
-        for det in plate_dets_in_frame:
-                px1, py1, px2, py2 = map(int, det["coordinates"])
-                conf = det.get("confidence", 0)
-                inside = px1 >= vx1 and py1 >= vy1 and px2 <= vx2 and py2 <= vy2
-                print(f"      plate=({px1},{py1},{px2},{py2}) conf={conf:.2f} inside_vehicle={inside}")
-                # Check if the license plate box is within the vehicle box (with some tolerance)
-                if inside:
-                    if conf > best_conf:
-                        best_conf = conf
-                        best_crop = frames[frame_idx][py1:py2, px1:px2]
-  if best_crop is None:
-        print("   ❌ No valid plate crop found (no plate inside any vehicle box)")
-        return 'Unknown'
-  if best_crop.size == 0:
-        print("   ❌ Best crop is empty (zero-size array)")
-        return 'Unknown'
-  print(f"   ✅ Best crop size: {best_crop.shape}  conf={best_conf:.2f}")
-  # Upscale small crops so the LPR model can read all digits
-  min_height = 64
-  if best_crop.shape[0] < min_height:
-        scale = min_height / best_crop.shape[0]
-        new_w = int(best_crop.shape[1] * scale)
-        best_crop = cv2.resize(best_crop, (new_w, min_height), interpolation=cv2.INTER_CUBIC)
-        print(f"   🔍 Upscaled crop to {best_crop.shape}")
-  try:
-            # Run our custom trained YOLO model on the cropped plate
-            results = lpr_model(best_crop, verbose=False)
+    best_plate_crop = None
+    max_plate_area = 0
+    plate_text = ""
+    
+    #loop through the history of the car's positions and look for license plate detections in those frames.
+    for frame_idx, car_coords in zip(history["frames"], history["coords"]):
+        # Find the analysis data for this specific frame index
+        frame_data = next((item for item in batch_analysis if item["frame_index"] == frame_idx), None)
+        if not frame_data:
+            continue
+            
+        # Look for license plate detections in this frame's analysis results
+        for det in frame_data["detections"]:
+            if det["class_name"] == "license_plate":
+                px1, py1, px2, py2 = det["coordinates"]
+                cx1, cy1, cx2, cy2 = car_coords
+                
+                #Verify that the detected license plate is within the bounding box of the car in this frame
+                if px1 >= cx1 and py1 >= cy1 and px2 <= cx2 and py2 <= cy2:
+                    plate_area = (px2 - px1) * (py2 - py1)
+                    
+                    # Get the largest detected plate area across the frames
+                    if plate_area > max_plate_area:
+                        max_plate_area = plate_area
+                        
+                        
+                        padding_x = int((px2 - px1) * 0.1) # 10% width
+                        padding_y = int((py2 - py1) * 0.1) # 10% height
+                        
+                        # calculate the crop coordinates with padding
+                        orig_frame = frames[frame_idx]
+                        img_h, img_w = orig_frame.shape[:2]
+                        
+                        crop_x1 = max(0, int(px1) - padding_x)
+                        crop_y1 = max(0, int(py1) - padding_y)
+                        crop_x2 = min(img_w, int(px2) + padding_x)
+                        crop_y2 = min(img_h, int(py2) + padding_y)
+                        
+                        #crop from the original high-resolution frame
+                        best_plate_crop = orig_frame[crop_y1:crop_y2, crop_x1:crop_x2]
 
-            if len(results) == 0 or len(results[0].boxes) == 0:
-                print("   ❌ LPR model found no characters in the crop")
-                return 'Unknown'
+    # if we found a plate crop, we enhance it and run the LPR model to read the text
+    if best_plate_crop is not None and best_plate_crop.size > 0:
+        
+        
+        # 1. Enhance the plate crop ()
+        upscaled_plate = cv2.resize(best_plate_crop,(best_plate_crop.shape[1]*4, best_plate_crop.shape[0]*4), 
+                      interpolation=cv2.INTER_LANCZOS4 )
+        
+       
+        
+        cv2.imwrite("debug_plate.jpg", best_plate_crop) 
+        cv2.imwrite("debug_plate_upscaled.jpg", upscaled_plate) 
+        
+        # 3. הפעלת מודל ה-LPR
+        print("🔍 Running LPR model on optimized crop...")
+        lpr_results = lpr_model(upscaled_plate, conf=0.5) 
+        
+        
+        if len(lpr_results) > 0 and len(lpr_results[0].boxes) > 0:
+            
+            detected_chars = []
+            for box in lpr_results[0].boxes:
+               x1, _, x2, _ = box.xyxy[0].tolist()
+               cls_id = int(box.cls[0].item())
+               char_name = lpr_model.names[cls_id]
+               detected_chars.append({
+                "char": char_name,
+                "x_center": (x1 + x2) / 2.0
+            })
+            
+            #sort the detected characters by their X coordinate to reconstruct the plate text in the correct order
+            detected_chars.sort(key=lambda d: d["x_center"]) 
+            plate_text = "".join([str(d["char"]) for d in detected_chars])
+            print(f"🔢 Plate Detected: {plate_text}")
+            if plate_text and len(plate_text) in [7, 8]:  # Assuming license plates have 7 or 8 digits
+                return plate_text
+        else:
+            print("⚠️ LPR model could not read the plate.")
+            plate_text = "Unreadable"
 
-            boxes = results[0].boxes
-            detections = []
-
-            # Extract each digit and its X-center coordinate
-            for box in boxes:
-                x1, _, x2, _ = box.xyxy[0].tolist()
-                cls_id = int(box.cls[0].item())
-                char_name = lpr_model.names[cls_id]
-                detections.append({
-                    "char": char_name,
-                    "x_center": (x1 + x2) / 2.0
-                })
-
-            #  Sort digits from left to right based on their X position!
-            detections = sorted(detections, key=lambda d: d["x_center"])
-            plate_text = "".join([str(d["char"]) for d in detections])
-
-            # Clean the text to keep only digits
-            clean_text = ''.join(filter(str.isdigit, plate_text))
-            print(f"   🔡 Raw LPR output: '{plate_text}'  →  digits only: '{clean_text}' (len={len(clean_text)})")
-
-            if clean_text and len(clean_text) in [7, 8]:  # Assuming license plates have 7 or 8 digits
-                return clean_text
-            print(f"   ⚠️  Digit count {len(clean_text)} not in [7,8] — returning Unknown")
-  except Exception as e:
-            print(f"   ❌ LPR Model Error: {e}")
-
-  return 'Unknown'  # Failed to extract a valid plate number
+    return plate_text

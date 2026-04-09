@@ -31,6 +31,18 @@ async def get_debug_image():
     if os.path.exists(image_path):
         return FileResponse(image_path)
     return {"error": "No debug image found yet. Send a batch from the app first!"}
+@app.get("/debug_plate")
+async def get_debug_plate():
+    image_path = "debug_plate.jpg"
+    if os.path.exists(image_path):
+        return FileResponse(image_path)
+    return {"error": "No plate image found yet. Send a batch with a violation first!"}
+@app.get("/debug_plate_upscaled")
+async def get_debug_plate_upscaled():
+    image_path = "debug_plate_upscaled.jpg"
+    if os.path.exists(image_path):
+        return FileResponse(image_path)
+    return {"error": "No plate image found yet. Send a batch with a violation first!"}
 
 @app.post("/analyze_batch")
 async def analyze_sequence(files: List[UploadFile] = File(...)):

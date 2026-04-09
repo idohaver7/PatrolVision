@@ -98,5 +98,5 @@ def test_lpr(image_path):
 
 
 if __name__ == "__main__":
-    IMAGE_PATH = '1.png'
+    IMAGE_PATH = 'check.png'
     test_lpr(IMAGE_PATH)
