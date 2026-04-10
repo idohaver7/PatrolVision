@@ -2,8 +2,8 @@
 import axios from 'axios';
 
 // ⚠️ IMPORTANT: Ensure this IP matches your computer's IP via 'ipconfig'
-export const SERVER_URL = 'http://192.168.1.64:5000'; 
-const BASE_URL = 'http://192.168.1.64:5000/api'; 
+export const SERVER_URL = 'http://192.168.1.65:5000'; 
+const BASE_URL = 'http://192.168.1.65:5000/api'; 
 const FASTAPI_URL = 'https://idohaver7-patrolvision.hf.space/analyze_batch';
 
 const api = axios.create({
@@ -71,6 +71,17 @@ export const fetchViolations = async (token, params = {}) => {
   }
 };
 // --- Traffic Enforcement Services ---
+export const warmupAnalysisServer = async () => {
+  try {
+    await axios.post(FASTAPI_URL, new FormData(), {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 90000,
+    });
+  } catch (e) {
+    // server might return an error (e.g. empty batch), but as long as it responded it's warm
+  }
+};
+
 export const analyzeTrafficFrame = async (imageUris) => {
   try {
     console.log(`\n📤 [API] Preparing to send batch of ${imageUris.length} frames...`);
@@ -94,10 +105,16 @@ export const analyzeTrafficFrame = async (imageUris) => {
     console.log("📦 [API] Server data:", response.data);
     return { success: true, data: response.data };
   } catch (error) {
-    console.error("❌ [API] Request FAILED:", error.message);
-    console.log("FastAPI Error:", error.message);
-    return { success: false, error: error.message };
-  }
+    if (error.response) {
+        console.log("❌ Server Error Data:", error.response.data);
+        console.log("❌ Server Error Status:", error.response.status);
+      } else if (error.request) {
+        console.log("❌ Network/Timeout Error - No response received");
+      } else {
+        console.log("❌ Error:", error.message);
+      }
+      return { success: false, error: error.message };
+    }
 };
 
 export const reportViolation = async (token, violationData) => {
@@ -121,6 +138,7 @@ export const reportViolation = async (token, violationData) => {
         'Authorization': `Bearer ${token}` 
       },
     });
+    console.log("api.js: Violation reported successfully:", response.data);
 
     return { success: true, data: response.data };
   } catch (error) {
@@ -128,5 +146,16 @@ export const reportViolation = async (token, violationData) => {
   }
 };
 
+
+export const fetchViolationById = async (token, id) => {
+  try {
+    const response = await api.get(`/violations/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return { success: true, data: response.data.data };
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
 
 export default api;

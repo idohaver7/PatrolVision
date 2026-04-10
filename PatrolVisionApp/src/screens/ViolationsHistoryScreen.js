@@ -100,7 +100,7 @@ const ViolationItem = ({ item, onPress }) => {
         </View>
       </View>
       
-      <Image source={{ uri: `${SERVER_URL}/${item.mediaUrl}` }} style={styles.thumbnail} resizeMode="cover" />
+      <Image source={{ uri: `${SERVER_URL}${item.mediaUrl}` }} style={styles.thumbnail} resizeMode="cover" />
     </Pressable>
   );
 };

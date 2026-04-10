@@ -8,7 +8,7 @@ PASSING_DISTANCE_THRESHOLD = 0.2
 CLEANING_TIME_SECONDS = 60  
 reported_violators = {}  # To keep track of already reported violations and avoid duplicates
 #solid line crossing violation detection logic:
-def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
+def detect_solid_line_violation(batch_analysis, frames, lpr_model, image_height=512):
     print("\n--- 🕵️ DEBUG: STARTING SOLID LINE LOGIC ---")
     #collect the history of each tracked vehicle across the frames
     vehicle_history = {} # Id History
@@ -29,7 +29,7 @@ def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
         ]
         
         for det in frame_data["detections"]:
-            if (det["class_name"] == "car" or det["class_name"] == "bus" or det["class_name"] == "truck") and det.get("track_id", -1) != -1 and not is_far(det):
+            if (det["class_name"] == "car" or det["class_name"] == "bus" or det["class_name"] == "truck") and det.get("track_id", -1) != -1 and not is_far(det, image_height):
                 track_id = det["track_id"]
                 
                 if track_id not in vehicle_history:
@@ -101,7 +101,7 @@ def detect_solid_line_violation(batch_analysis,frames,ocr_reader):
                 continue
             reported_violators[track_id] = current_time  # Mark this violator as reported
             print(f"   🏆 >>> VIOLATION CONFIRMED FOR ID {track_id} <<<")
-            license_plate = extract_license_plate(history, batch_analysis,frames,ocr_reader)
+            license_plate = extract_license_plate(history, batch_analysis,frames,lpr_model)
             return {
                 "violation": True,
                 "type": "Illegal Overtaking",

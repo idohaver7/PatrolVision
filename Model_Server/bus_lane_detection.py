@@ -23,7 +23,7 @@ def is_taxi(car_coords, taxi_hats):
             return True
             
     return False
-def detect_bus_line_violation(batch_analysis, frames, ocr_reader):
+def detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height=512):
     print("\n--- 🚌 DEBUG: STARTING BUS LANE LOGIC ---")
     vehicle_history = {} #Id History
     current_time = time.time()
@@ -54,7 +54,7 @@ def detect_bus_line_violation(batch_analysis, frames, ocr_reader):
             if det["class_name"] == "taxi_hat" and det["type"] == "box"
         ]
         for det in frame_data["detections"]:
-            if (det["class_name"] == "car" or det["class_name"] == "truck") and det.get("track_id", -1) != -1 and not is_far(det):
+            if (det["class_name"] == "car" or det["class_name"] == "truck") and det.get("track_id", -1) != -1 and not is_far(det, image_height):
                 track_id = det["track_id"]
                 car_coords = det["coordinates"]
                 has_hat_in_this_frame = is_taxi(car_coords, taxi_hats)
@@ -127,7 +127,7 @@ def detect_bus_line_violation(batch_analysis, frames, ocr_reader):
             reported_violators[track_id] = current_time
             print(f"   🏆 >>> BUS LANE VIOLATION CONFIRMED FOR ID {track_id} <<<")
             
-            plate_text = extract_license_plate(history, batch_analysis, frames, ocr_reader)
+            plate_text = extract_license_plate(history, batch_analysis, frames, lpr_model)
             
             return {
                 "violation": True,

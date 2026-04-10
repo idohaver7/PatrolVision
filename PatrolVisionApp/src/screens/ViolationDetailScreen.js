@@ -17,6 +17,7 @@ const ViolationDetailScreen = ({ route }) => {
   
   //  Get the data passed directly from the History list
   const { violation } = route.params;
+  console.log('Received violation data:', violation.mediaUrl);
 
   // --- Helper Functions ---
   

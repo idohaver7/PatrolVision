@@ -24,10 +24,9 @@ const HomeScreen = ({ navigation }) => {
     navigation.navigate('ViolationsHistory');
   };
 
-  const onSettings = () => {
-    // We'll create this screen later
-    alert('Navigate to Settings Screen (TODO)');
-  };
+  const onVideoAnalysis = () => {
+    navigation.navigate('VideoAnalysis');
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -46,6 +45,12 @@ const HomeScreen = ({ navigation }) => {
           <Icon name="play-arrow" size={24} style={styles.buttonIcon} />
           <Text style={styles.buttonText}>Start Drive</Text>
         </TouchableOpacity>
+          {/* Video Analysis Button (Primary) */}
+        <TouchableOpacity style={styles.button} onPress={onVideoAnalysis}>
+          <Icon name="video-library" size={24} style={styles.buttonIcon} />
+          <Text style={styles.buttonText}>Video Analysis</Text>
+        </TouchableOpacity>
+
 
         {/* Violations History Button (Secondary) */}
         <TouchableOpacity 
