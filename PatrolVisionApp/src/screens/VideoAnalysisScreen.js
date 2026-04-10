@@ -13,6 +13,7 @@ import {
   Dimensions,
   ActivityIndicator,
   StyleSheet,
+  Modal,
 } from 'react-native';
 import Video from 'react-native-video';
 import { createThumbnail } from 'react-native-create-thumbnail'; 
@@ -20,11 +21,12 @@ import { pick, types, isCancel } from '@react-native-documents/picker';
 import Geolocation from 'react-native-geolocation-service';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { analyzeTrafficFrame, warmupAnalysisServer } from '../services/api';
+import { analyzeTrafficFrame, warmupAnalysisServer, fetchViolationById } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import styles from './VideoAnalysisScreen.styles';
 
 const FRAMES_BATCH_SIZE = 4;
-const EXTRACTION_FPS = 4; // 4 פריימים בשנייה זה מושלם כדי לאזן בין מהירות טעינה לזיהוי
+const EXTRACTION_FPS = 4;
 const SEEK_STEP = 10;
 const SPEEDS = [0.5, 1, 1.5, 2];
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -70,26 +72,28 @@ const Scrubber = ({ progress, duration, onSeek }) => {
 };
 
 // ── Violation Card ────────────────────────────────────────
-const ViolationCard = ({ violation, index, onReport }) => (
+const ViolationCard = ({ violation, index, onViewDetails }) => (
   <View style={styles.violationCard}>
     <View style={styles.violationCardLeft}>
       <Icon name="warning" size={22} color="#FF6B35" />
       <View style={styles.violationCardInfo}>
         <Text style={styles.violationCardType}>{violation.type}</Text>
         <Text style={styles.violationCardMeta}>
-          🕐 {formatTime(violation.videoTime)}
-          {violation.plate ? `   🚘 ${violation.plate}` : ''}
+          {formatTime(violation.videoTime)}
+          {violation.plate ? `   ${violation.plate}` : ''}
         </Text>
       </View>
     </View>
-    <TouchableOpacity style={styles.reportBtn} onPress={() => onReport(violation, index)}>
-      <Text style={styles.reportBtnText}>Report</Text>
+    <TouchableOpacity style={styles.viewDetailsBtn} onPress={() => onViewDetails(violation, index)}>
+      <Icon name="visibility" size={16} color="#FFF" />
+      <Text style={styles.viewDetailsBtnText}>Details</Text>
     </TouchableOpacity>
   </View>
 );
 
-const VideoAnalysisScreen = ({ navigation }) => {
+const VideoAnalysisScreen = ({ navigation,route }) => {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const videoRef     = useRef(null);
   const videoFileRef = useRef(null);
 
@@ -163,6 +167,14 @@ const VideoAnalysisScreen = ({ navigation }) => {
     };
     init();
   }, []);
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isStoppedRef.current = true;
+      framesBatchRef.current = [];
+      preloadedFramesRef.current = [];
+    };
+  }, []);
 
   const pickVideo = async () => {
     try {
@@ -177,6 +189,7 @@ const VideoAnalysisScreen = ({ navigation }) => {
       setViolations([]);
       violationsRef.current = [];
       preloadedFramesRef.current = [];
+      framesBatchRef.current = [];
       isStoppedRef.current = false;
       isUploadingRef.current = false;
       setControlsVisible(true);
@@ -185,7 +198,7 @@ const VideoAnalysisScreen = ({ navigation }) => {
     }
   };
 
-  // ── Pre-processing (הכנת התמונות מראש למניעת תקיעות) ──────────────────────────
+  // ── Pre-processing  ──────────────────────────
   const prepareFramesAheadOfTime = async () => {
     if (videoDuration <= 0) return;
     isStoppedRef.current = false;
@@ -203,7 +216,8 @@ const VideoAnalysisScreen = ({ navigation }) => {
         const thumb = await createThumbnail({ url: videoFileRef.current.uri, timeStamp: timeMs,
           maxWidth: 1920,   
           maxHeight: 1080});
-        extractedFrames.push('file://' + thumb.path);
+        const framePath = thumb.path.startsWith('file://') ? thumb.path : 'file://' + thumb.path;
+        extractedFrames.push(framePath);
         setLoadingProgress(Math.round((extractedFrames.length / expectedFramesCount) * 100));
       } catch (err) {
         extractedFrames.push(null); 
@@ -249,6 +263,7 @@ const VideoAnalysisScreen = ({ navigation }) => {
     setStatus('done');
     setControlsVisible(true);
     framesBatchRef.current = [];
+    setShowResults(true);
   };
 
   const resetScreen = () => {
@@ -259,19 +274,38 @@ const VideoAnalysisScreen = ({ navigation }) => {
     setCurrentTime(0);
     setVideoDuration(0);
     setViolations([]);
+    setShowResults(false);
     violationsRef.current = [];
     framesBatchRef.current = [];
     lastSentFrameIndexRef.current = -1;
     preloadedFramesRef.current = [];
   };
 
-  const reportViolation = (violation) => {
-    navigation.navigate('NewViolation', {
+  const [showResults, setShowResults] = useState(false);
+
+  const viewViolationDetails = async (violation) => {
+    if (violation.serverId) {
+      const result = await fetchViolationById(token, violation.serverId);
+      if (result.success) {
+        navigation.navigate('ViolationDetail', { violation: result.data });
+        return;
+      }
+    }
+    // Fallback if server fetch fails or no serverId
+    const violationData = {
+      _id: `local_${Date.now()}`,
       violationType: violation.type,
-      plate: violation.plate,
-      imageUri: violation.imageUri,
-      location: violation.location,
-    });
+      licensePlate: violation.plate || 'Unknown',
+      mediaUrl: violation.imageUri,
+      address: violation.location ? `${violation.location.latitude.toFixed(4)}, ${violation.location.longitude.toFixed(4)}` : 'Unknown',
+      location: violation.location ? {
+        type: 'Point',
+        coordinates: [violation.location.longitude, violation.location.latitude],
+      } : null,
+      status: 'Pending Review',
+      timestamp: new Date().toISOString(),
+    };
+    navigation.navigate('ViolationDetail', { violation: violationData });
   };
 
   const sendBatchInBackground = useCallback(async (batch) => {
@@ -299,6 +333,21 @@ const VideoAnalysisScreen = ({ navigation }) => {
           plate: result.data.license_plate,
           imageUri: newViolation.imageUri,
           location: newViolation.location,
+          onReturnId: (serverId) => {
+            
+            //Get The violation ID from new violation screen
+            if (serverId && violationsRef.current.length > 0) {
+              const last = violationsRef.current[violationsRef.current.length - 1];
+              last.serverId = serverId;
+              setViolations([...violationsRef.current]);
+            }
+            
+            // Resume the video and analysis after returning from the violation screen
+            pausedForViolationRef.current = false;
+            framesBatchRef.current = [];
+            isUploadingRef.current = false;
+            setIsPaused(false);
+          }
         });
       }
     } catch (err) {
@@ -308,52 +357,51 @@ const VideoAnalysisScreen = ({ navigation }) => {
     }
   }, [navigation]);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      if (pausedForViolationRef.current) {
-        pausedForViolationRef.current = false;
-        framesBatchRef.current = [];
-        isUploadingRef.current = false;
-        setIsPaused(false);
-      }
-    });
-    return unsubscribe;
-  }, [navigation]);
-
-  // ── הלולאה ששואבת תמונות מהזיכרון בזמן ריצה ─────────────────────────────────
+  // ── Simulation Loop ─────────────────────────────────
   useEffect(() => {
     if (status !== 'analyzing') return;
     let isMounted = true;
 
     const simulationLoop = async () => {
-      if (!isMounted || isStoppedRef.current || isPaused) return;
+      if (!isMounted) return;
 
       try {
-        const currentFrameIndex = Math.floor(currentTimeRef.current * EXTRACTION_FPS);
-        
-        if (currentFrameIndex !== lastSentFrameIndexRef.current && currentFrameIndex < preloadedFramesRef.current.length) {
-          const frameUri = preloadedFramesRef.current[currentFrameIndex];
-          lastSentFrameIndexRef.current = currentFrameIndex;
+        //--- insert frames to the batch based on current video time ---
+        if (!isPaused && !isStoppedRef.current) {
+          const currentFrameIndex = Math.floor(currentTimeRef.current * EXTRACTION_FPS);
+          
+          if (currentFrameIndex !== lastSentFrameIndexRef.current && currentFrameIndex < preloadedFramesRef.current.length) {
+            const frameUri = preloadedFramesRef.current[currentFrameIndex];
+            lastSentFrameIndexRef.current = currentFrameIndex;
 
-          if (frameUri) {
-            framesBatchRef.current.push({ original: frameUri, compressed: frameUri });
-
-            if (framesBatchRef.current.length >= FRAMES_BATCH_SIZE && !isUploadingRef.current) {
-              const batchToSend = framesBatchRef.current.splice(0, FRAMES_BATCH_SIZE);
-              sendBatchInBackground(batchToSend);
+            if (frameUri) {
+              framesBatchRef.current.push({ original: frameUri, compressed: frameUri });
             }
-            else if (isStoppedRef.current && framesBatchRef.current.length > 0 && !isUploadingRef.current){
-              const batchToSend = framesBatchRef.current.splice(0, framesBatchRef.current.length);
-              sendBatchInBackground(batchToSend);
-            }
-
           }
         }
+
+        //--- send batch to the server based on conditions ---
+        if (framesBatchRef.current.length >= FRAMES_BATCH_SIZE && !isUploadingRef.current) {
+          const batchToSend = framesBatchRef.current.splice(0, FRAMES_BATCH_SIZE);
+          sendBatchInBackground(batchToSend);
+        }
+        // The video is over but there are still frames that haven't been sent and we're not currently uploading - let's send them in the background before fully stopping
+        else if ((isPaused || isStoppedRef.current) && framesBatchRef.current.length > 0 && !isUploadingRef.current){
+          const batchToSend = framesBatchRef.current.splice(0, framesBatchRef.current.length);
+          sendBatchInBackground(batchToSend);
+        }
+        
+        // Stop the loop only if there isnt frames in the queue
+        else if (isStoppedRef.current && framesBatchRef.current.length === 0 && !isUploadingRef.current) {
+          return; 
+        }
+
       } catch (err) {
         console.log('Simulation loop error:', err);
       }
       
-      if (isMounted && !isStoppedRef.current) setTimeout(simulationLoop, 50);
+      
+      if (isMounted) setTimeout(simulationLoop, 50);
     };
 
     simulationLoop();
@@ -395,6 +443,7 @@ const VideoAnalysisScreen = ({ navigation }) => {
               setIsPaused(true);
               setStatus('done');
               setControlsVisible(true);
+              setShowResults(true);
             }}
             repeat={false}
           />
@@ -414,13 +463,6 @@ const VideoAnalysisScreen = ({ navigation }) => {
             <View style={[styles.liveBadge, { zIndex: 2 }]}>
               <Animated.View style={[styles.liveDot, { opacity: fadeAnim }]} />
               <Text style={styles.liveText}>ANALYZING</Text>
-            </View>
-          )}
-
-          {violations.length > 0 && (
-            <View style={[styles.violationCountBadge, { zIndex: 2 }]}>
-              <Icon name="warning" size={13} color="#FFF" />
-              <Text style={styles.violationCountText}>{violations.length}</Text>
             </View>
           )}
 
@@ -454,24 +496,57 @@ const VideoAnalysisScreen = ({ navigation }) => {
         </TouchableOpacity>
       )}
 
-      {(status === 'analyzing' || status === 'done') && (
-        <ScrollView style={styles.summaryList} contentContainerStyle={styles.summaryListContent} showsVerticalScrollIndicator={false}>
-          {violations.length === 0 ? (
-            status === 'done' ? (
-              <View style={styles.noViolationsRow}><Icon name="check-circle" size={20} color="#4CAF50" /><Text style={styles.noViolationsText}>No violations detected</Text></View>
-            ) : (<Text style={styles.scanningText}>Scanning for violations…</Text>)
-          ) : (
-            <>
-              <Text style={styles.summaryHeader}>{violations.length} violation{violations.length > 1 ? 's' : ''} found</Text>
-              {violations.map((v, i) => <ViolationCard key={i} violation={v} index={i} onReport={reportViolation} />)}
-            </>
-          )}
-        </ScrollView>
-      )}
+      {/* Results Modal — full screen overlay when analysis is done/stopped */}
+      <Modal visible={showResults} animationType="slide" transparent>
+        <View style={styles.resultsOverlay}>
+          <View style={styles.resultsContainer}>
+            {/* Results Header */}
+            <View style={styles.resultsHeader}>
+              <Icon
+                name={violations.length > 0 ? 'report-problem' : 'verified'}
+                size={32}
+                color={violations.length > 0 ? '#FF6B35' : '#4CAF50'}
+              />
+              <Text style={styles.resultsTitle}>Analysis Complete</Text>
+              <Text style={styles.resultsSubtitle}>
+                {violations.length > 0
+                  ? `${violations.length} violation${violations.length > 1 ? 's' : ''} detected`
+                  : 'No violations were detected in this video'}
+              </Text>
+            </View>
+
+            {/* Violations List */}
+            <ScrollView style={styles.resultsList} contentContainerStyle={styles.resultsListContent} showsVerticalScrollIndicator={false}>
+              {violations.length === 0 ? (
+                <View style={styles.noViolationsBig}>
+                  <Icon name="check-circle" size={48} color="#4CAF50" />
+                  <Text style={styles.noViolationsBigText}>All clear! No traffic violations found.</Text>
+                </View>
+              ) : (
+                violations.map((v, i) => (
+                  <ViolationCard key={i} violation={v} index={i} onViewDetails={viewViolationDetails} />
+                ))
+              )}
+            </ScrollView>
+
+            {/* Results Actions */}
+            <View style={styles.resultsActions}>
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => { setShowResults(false); resetScreen(); }}
+                activeOpacity={0.8}
+              >
+                <Icon name="refresh" size={20} color="#FFF" />
+                <Text style={styles.secondaryButtonText}>New Analysis</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.gpsRow}>
         <Icon name="gps-fixed" size={14} color={currentLocation ? '#4CAF50' : '#FFC107'} />
-        <Text style={styles.gpsText}>{currentLocation ? 'GPS acquired' : 'Acquiring GPS…'}</Text>
+        <Text style={styles.gpsText}>{currentLocation ? 'GPS acquired' : 'Acquiring GPS...'}</Text>
       </View>
 
       <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 16 }]}>
@@ -494,16 +569,21 @@ const VideoAnalysisScreen = ({ navigation }) => {
           </View>
         )}
         {status === 'analyzing' && (
-          <TouchableOpacity style={styles.dangerButton} onPress={stopAnalysis} activeOpacity={0.8}>
-            <Icon name="stop" size={22} color="#FFF" />
-            <Text style={styles.dangerButtonText}>Stop Analysis</Text>
+          <TouchableOpacity style={styles.stopButton} onPress={stopAnalysis} activeOpacity={0.8}>
+            <Text style={styles.stopButtonText}>Stop Analysis</Text>
           </TouchableOpacity>
         )}
-        {status === 'done' && (
-          <TouchableOpacity style={styles.secondaryButton} onPress={resetScreen} activeOpacity={0.8}>
-            <Icon name="refresh" size={20} color="#FFF" />
-            <Text style={styles.secondaryButtonText}>Analyse Another Video</Text>
-          </TouchableOpacity>
+        {status === 'done' && !showResults && (
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => setShowResults(true)} activeOpacity={0.8}>
+              <Icon name="assessment" size={20} color="#FFF" />
+              <Text style={styles.primaryButtonText}>View Results</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={resetScreen} activeOpacity={0.8}>
+              <Icon name="refresh" size={20} color="#FFF" />
+              <Text style={styles.secondaryButtonText}>New Analysis</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </View>

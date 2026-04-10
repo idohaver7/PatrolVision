@@ -2,8 +2,8 @@
 import axios from 'axios';
 
 // ⚠️ IMPORTANT: Ensure this IP matches your computer's IP via 'ipconfig'
-export const SERVER_URL = 'http://192.168.1.54:5000'; 
-const BASE_URL = 'http://192.168.1.54:5000/api'; 
+export const SERVER_URL = 'http://192.168.1.65:5000'; 
+const BASE_URL = 'http://192.168.1.65:5000/api'; 
 const FASTAPI_URL = 'https://idohaver7-patrolvision.hf.space/analyze_batch';
 
 const api = axios.create({
@@ -138,6 +138,7 @@ export const reportViolation = async (token, violationData) => {
         'Authorization': `Bearer ${token}` 
       },
     });
+    console.log("api.js: Violation reported successfully:", response.data);
 
     return { success: true, data: response.data };
   } catch (error) {
@@ -145,5 +146,16 @@ export const reportViolation = async (token, violationData) => {
   }
 };
 
+
+export const fetchViolationById = async (token, id) => {
+  try {
+    const response = await api.get(`/violations/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return { success: true, data: response.data.data };
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
 
 export default api;

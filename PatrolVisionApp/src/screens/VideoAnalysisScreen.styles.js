@@ -286,13 +286,16 @@ export default StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  reportBtn: {
-    backgroundColor: '#E53935',
+  viewDetailsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#4A90E2',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  reportBtnText: {
+  viewDetailsBtnText: {
     color: '#FFF',
     fontSize: 13,
     fontWeight: '700',
@@ -388,19 +391,80 @@ export default StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  dangerButton: {
-    flex: 1,
-    flexDirection: 'row',
+  stopButton: {
+    width: '100%',
+    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: COLORS.danger,
-    borderRadius: 12,
-    paddingVertical: 15,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(229,57,53,0.5)',
   },
-  dangerButtonText: {
-    color: '#FFFFFF',
+  stopButtonText: {
+    color: '#E53935',
     fontSize: 16,
     fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+
+  // ── Results Modal ─────────────────────────────────────────
+  resultsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 40,
+  },
+  resultsContainer: {
+    flex: 1,
+    backgroundColor: '#0A1628',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(74,144,226,0.3)',
+  },
+  resultsHeader: {
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(74,144,226,0.08)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+    gap: 8,
+  },
+  resultsTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  resultsSubtitle: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  resultsList: {
+    flex: 1,
+  },
+  resultsListContent: {
+    padding: 16,
+    gap: 10,
+  },
+  resultsActions: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  noViolationsBig: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    gap: 16,
+  },
+  noViolationsBigText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 16,
+    textAlign: 'center',
   },
 });

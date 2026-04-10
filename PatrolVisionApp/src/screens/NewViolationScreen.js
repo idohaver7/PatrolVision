@@ -15,7 +15,7 @@ import { COLORS } from '../theme/colors';
 
 const NewViolationScreen = ({ route, navigation }) => {
   // Accessing violation details passed from LiveCameraScreen
-  const { violationType, plate, imageUri, location } = route.params;
+  const { violationType, plate, imageUri, location,onReturnId } = route.params;
   const { token } = useAuth();
 
   // Timestamp formatting
@@ -24,16 +24,20 @@ const NewViolationScreen = ({ route, navigation }) => {
     hour: 'numeric', minute: 'numeric', hour12: true
   });
 
-  useEffect(() => {
+useEffect(() => {
+    let isMounted = true;
+
     const handleViolationProcess = async () => {
-      // Vibration pattern: vibrate for 500ms, pause for 200ms, then vibrate for another 500ms
       try {
         Vibration.vibrate([0, 500, 200, 500]); 
       } catch (err) {
         console.warn("Vibration failed:", err);
       }
 
-      // Auto-reporting the violation to the backend
+      //Timer
+      const timerPromise = new Promise(resolve => setTimeout(resolve, 3000));// 3 seconds timer to allow user to see the violation details before navigating away
+
+      // sent the violation report
       const reportData = {
         violationType,
         licensePlate: plate || null,
@@ -43,24 +47,36 @@ const NewViolationScreen = ({ route, navigation }) => {
         timestamp: new Date().toISOString()
       };
 
+      let violationId = null;
+
       try {
-        console.log("🚀 Auto-reporting violation...", reportData);
-        await reportViolation(token, reportData); 
+        const result = await reportViolation(token, reportData);
+        
+        if (result.success && result.data?.data?._id) {
+          violationId = result.data.data._id;
+          console.log("New_Violation reported successfully, server ID:", violationId);
+        }
       } catch (error) {
         console.error("Failed to auto-report:", error);
+      }
+
+      
+      await timerPromise;
+
+      if (!isMounted) return;
+
+      if (onReturnId ) {
+        onReturnId( violationId || null );
+      }
+
+      // Navigate back to the previous screen  after processing
+      if (navigation.canGoBack()) {
+        navigation.goBack();
       }
     };
 
     handleViolationProcess();
-
-    // Auto-navigate back to LiveCameraScreen after 5 seconds
-    const timer = setTimeout(() => {
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      }
-    }, 5000);
-
-    return () => clearTimeout(timer);
+    return () => { isMounted = false; };
   }, []);
 
   return (
