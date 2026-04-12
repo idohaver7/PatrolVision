@@ -2,8 +2,8 @@
 import axios from 'axios';
 
 // ⚠️ IMPORTANT: Ensure this IP matches your computer's IP via 'ipconfig'
-export const SERVER_URL = 'http://192.168.1.65:5000'; 
-const BASE_URL = 'http://192.168.1.65:5000/api'; 
+export const SERVER_URL = 'http://192.168.1.35:5000'; 
+const BASE_URL = 'http://192.168.1.35:5000/api'; 
 const FASTAPI_URL = 'https://idohaver7-patrolvision.hf.space/analyze_batch';
 
 const api = axios.create({
@@ -82,7 +82,7 @@ export const warmupAnalysisServer = async () => {
   }
 };
 
-export const analyzeTrafficFrame = async (imageUris) => {
+export const analyzeTrafficFrame = async (imageUris,signal) => {
   try {
     console.log(`\n📤 [API] Preparing to send batch of ${imageUris.length} frames...`);
     console.log(`🔗 [API] Target URL: ${FASTAPI_URL}`);
@@ -100,16 +100,21 @@ export const analyzeTrafficFrame = async (imageUris) => {
     const response = await axios.post(FASTAPI_URL, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 10000, // Timeout 
+      signal: signal, // Pass the AbortSignal for cancellation
     });
     console.log("✅ [API] Server responded with status:", response.status);
     console.log("📦 [API] Server data:", response.data);
     return { success: true, data: response.data };
   } catch (error) {
-    if (error.response) {
+      if(axios.isCancel(error)) {
+        console.log("⚠️ [API] Request was cancelled by the client.");
+        return { success: false, error: "Request cancelled" };
+      }
+      else if (error.response) {
         console.log("❌ Server Error Data:", error.response.data);
         console.log("❌ Server Error Status:", error.response.status);
       } else if (error.request) {
-        console.log("❌ Network/Timeout Error - No response received");
+        console.log("❌ Network/Timeout Error - No response received. Code: ${error.code}, Message: ${error.message}");
       } else {
         console.log("❌ Error:", error.message);
       }

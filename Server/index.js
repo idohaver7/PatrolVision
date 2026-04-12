@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 
 // Load Environment Variables (Standard 'dotenv')
 require('dotenv').config();
@@ -9,6 +11,26 @@ require('dotenv').config();
 // App Setup
 const app = express();
 const PORT = process.env.PORT;
+
+// Create HTTP server and attach Socket.IO
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+// Make io accessible to controllers via req.app
+app.set('io', io);
+
+// Socket.IO connection handler
+io.on('connection', (socket) => {
+  console.log('📡 Dashboard connected:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('📡 Dashboard disconnected:', socket.id);
+  });
+});
 
 // Middleware
 app.use(cors()); // Allows requests from React Native
@@ -38,7 +60,7 @@ app.get('/', (req, res) => res.send('PatrolVision API Running'));
 
 // Start Server
 connectDB().then(() => {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
   });
 });

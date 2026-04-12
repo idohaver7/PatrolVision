@@ -102,6 +102,7 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [violations, setViolations] = useState([]);
   const [loadingProgress, setLoadingProgress] = useState(0); 
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   const [isPaused, setIsPaused] = useState(true);
   const [videoDuration, setVideoDuration] = useState(0);
@@ -113,6 +114,7 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
   const isStoppedRef   = useRef(false);
   const preloadedFramesRef = useRef([]);
   const lastSentFrameIndexRef = useRef(-1);
+  const abortControllerRef = useRef(null);
   const framesBatchRef = useRef([]);
   const isUploadingRef = useRef(false);
   const locationRef    = useRef(null);
@@ -173,6 +175,9 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
       isStoppedRef.current = true;
       framesBatchRef.current = [];
       preloadedFramesRef.current = [];
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, []);
 
@@ -185,10 +190,12 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
       setVideoFile(fileObj);
       setStatus('ready');
       setIsPaused(true);
+      setIsFinalizing(false);
       setCurrentTime(0);
       setViolations([]);
       violationsRef.current = [];
       preloadedFramesRef.current = [];
+      abortControllerRef.current = new AbortController();
       framesBatchRef.current = [];
       isStoppedRef.current = false;
       isUploadingRef.current = false;
@@ -205,6 +212,7 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
     isUploadingRef.current = false;
     setStatus('preprocessing');
     setControlsVisible(false);
+    abortControllerRef.current = new AbortController();
     await warmupAnalysisServer();
     const intervalMs = 1000 / EXTRACTION_FPS; 
     const totalMs = Math.floor(videoDuration * 1000);
@@ -264,11 +272,15 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
     setControlsVisible(true);
     framesBatchRef.current = [];
     setShowResults(true);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
   };
 
   const resetScreen = () => {
     isStoppedRef.current = true;
     setIsPaused(true);
+    setIsFinalizing(false);
     setStatus('idle');
     setVideoFile(null);
     setCurrentTime(0);
@@ -279,6 +291,10 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
     framesBatchRef.current = [];
     lastSentFrameIndexRef.current = -1;
     preloadedFramesRef.current = [];
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
   };
 
   const [showResults, setShowResults] = useState(false);
@@ -312,7 +328,10 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
     isUploadingRef.current = true;
     try {
       const uris = batch.map(item => item.compressed);
-      const result = await analyzeTrafficFrame(uris);
+      const result = await analyzeTrafficFrame(uris, abortControllerRef.current?.signal);
+      if(!result.success&& result.error === "Request cancelled") {
+        return;
+      }
       if (result.success && result.data.violation) {
         const winningIndex = result.data.last_violation_frame ?? batch.length - 1;
         const newViolation = {
@@ -393,7 +412,10 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
         
         // Stop the loop only if there isnt frames in the queue
         else if (isStoppedRef.current && framesBatchRef.current.length === 0 && !isUploadingRef.current) {
-          return; 
+          setIsFinalizing(false); 
+          setStatus('done');   
+          setShowResults(true);   
+          return;
         }
 
       } catch (err) {
@@ -441,9 +463,15 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
             onEnd={() => {
               isStoppedRef.current = true;
               setIsPaused(true);
-              setStatus('done');
               setControlsVisible(true);
-              setShowResults(true);
+              //Check if there are still frames that haven't been sent or currently uploading - if so, show the finalizing screen until they're done before showing results
+              if (framesBatchRef.current.length > 0 || isUploadingRef.current) {
+                setIsFinalizing(true); // show finalizing screen
+              } else {
+                // No pending frames or uploads, we can show results immediately
+                setStatus('done');
+                setShowResults(true);
+              }
             }}
             repeat={false}
           />
@@ -485,6 +513,16 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
                 <TouchableOpacity onPress={() => seekBy(SEEK_STEP)} style={styles.transportBtn}><Icon name="forward-10" size={28} color="#FFF" /></TouchableOpacity>
                 <TouchableOpacity onPress={seekToEnd} style={styles.transportBtn}><Icon name="skip-next" size={28} color="#FFF" /></TouchableOpacity>
               </View>
+            </View>
+          )}
+          {isFinalizing && (
+            <View style={[styles.controlsOverlay, { zIndex: 5, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+              <ActivityIndicator size="large" color="#FF6B35" style={{ marginBottom: 16 }} />
+              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: 'bold' }}>Just a moment...</Text>
+              <Text style={{ color: '#CCC', fontSize: 15, marginTop: 8, textAlign: 'center', paddingHorizontal: 24 }}>
+               🧠The Video is over{'\n'}
+                But we are still analyzing the last few seconds.
+              </Text>
             </View>
           )}
         </View>

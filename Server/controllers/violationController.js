@@ -81,6 +81,15 @@ exports.reportViolation = async (req, res) => {
       status: 'Pending Review'
     });
 
+    // 6. Populate user info and emit real-time event to dashboard
+    const populatedViolation = await Violation.findById(violation._id)
+      .populate('user', 'firstName lastName email phoneNumber');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('newViolation', populatedViolation);
+    }
+
     res.status(201).json({
       success: true,
       data: violation
