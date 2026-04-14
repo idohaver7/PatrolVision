@@ -1,9 +1,12 @@
 // src/pages/Dashboard.jsx
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { io } from 'socket.io-client';
 import { getAnalytics, getAllViolations, updateViolationStatus, updateViolationPlate, logout } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import { CheckCircle, XCircle, LogOut, CheckSquare, Ban, Search, Map as MapIcon, List as ListIcon, LayoutDashboard, AlertTriangle, Inbox, User, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { CheckCircle, XCircle, LogOut, CheckSquare, Ban, Search, Map as MapIcon, List as ListIcon, LayoutDashboard, AlertTriangle, Inbox, User, ChevronLeft, ChevronRight, X, Bell } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+
+const SOCKET_URL = 'http://localhost:5000';
 
 // --- Global Constants & Configurations ---
 const VIOLATION_COLORS = {
@@ -39,6 +42,50 @@ const Dashboard = () => {
 
   // --- Modal States: Custom Confirmation ---
   const [confirmAction, setConfirmAction] = useState({ isOpen: false, id: null, newStatus: '' });
+
+  // --- Real-time Notification State ---
+  const [toasts, setToasts] = useState([]);
+  const toastTimeoutRef = useRef({});
+
+  const addToast = useCallback((violation) => {
+    const id = violation._id;
+    setToasts(prev => [...prev, { id, violation, timestamp: Date.now() }]);
+    // Auto-dismiss after 8 seconds
+    toastTimeoutRef.current[id] = setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+      delete toastTimeoutRef.current[id];
+    }, 8000);
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+    if (toastTimeoutRef.current[id]) {
+      clearTimeout(toastTimeoutRef.current[id]);
+      delete toastTimeoutRef.current[id];
+    }
+  }, []);
+
+  // --- Socket.IO Connection ---
+  useEffect(() => {
+    const socket = io(SOCKET_URL);
+
+    socket.on('newViolation', (violation) => {
+      // Add the new violation to the list
+      setAllViolations(prev => [violation, ...prev]);
+      // Refresh analytics
+      getAnalytics().then(res => setStats(res.data)).catch(console.error);
+      // Show toast notification
+      addToast(violation);
+      // Play notification sound
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbsGczHjqIxN/LdEQiOYfE3slyQiE5h8Tey3JCITmHxN7LckIhOYfE3styQiE5h8Tey3JCITmHxN7LckIhOYfE3st');
+        audio.volume = 0.3;
+        audio.play().catch(() => {});
+      } catch {}
+    });
+
+    return () => socket.disconnect();
+  }, [addToast]);
 
   /**
    * Initializes dashboard data by fetching user details, analytics, and violation records.
@@ -598,6 +645,66 @@ const Dashboard = () => {
             </div>
         </div>
       )}
+
+      {/* Real-time Toast Notifications */}
+      <div style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        zIndex: 3000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        maxWidth: '400px'
+      }}>
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+              padding: '16px',
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'flex-start',
+              animation: 'slideIn 0.3s ease-out',
+              borderLeft: `4px solid ${VIOLATION_COLORS[toast.violation.violationType] || '#3b82f6'}`
+            }}
+          >
+            <div style={{
+              background: '#fef3c7',
+              borderRadius: '50%',
+              padding: '8px',
+              flexShrink: 0
+            }}>
+              <Bell size={20} color="#d97706" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: '700', color: '#11101d', fontSize: '0.95rem', marginBottom: '4px' }}>
+                New Violation Reported
+              </div>
+              <div style={{ fontSize: '0.85rem', color: '#4b5563', lineHeight: '1.4' }}>
+                <strong style={{ color: VIOLATION_COLORS[toast.violation.violationType] }}>{toast.violation.violationType}</strong>
+                {toast.violation.licensePlate && toast.violation.licensePlate !== 'null' && (
+                  <span> — Plate: <strong style={{ fontFamily: 'monospace' }}>{toast.violation.licensePlate}</strong></span>
+                )}
+              </div>
+              {toast.violation.address && (
+                <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {toast.violation.address}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => dismissToast(toast.id)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '2px', flexShrink: 0 }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
 
       {/* 2. Custom Confirmation Modal */}
       {confirmAction.isOpen && (
