@@ -16,14 +16,28 @@ import {
   Modal,
 } from 'react-native';
 import Video from 'react-native-video';
-import { createThumbnail } from 'react-native-create-thumbnail'; 
+import { createThumbnail } from 'react-native-create-thumbnail';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import Geolocation from 'react-native-geolocation-service';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import RNFS from 'react-native-fs';
 import { analyzeTrafficFrame, warmupAnalysisServer, fetchViolationById } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import styles from './VideoAnalysisScreen.styles';
+
+// ── Debug Config ───────────────────────────────────────────────────────────────
+const DEBUG_SAVE_FRAMES = true; // Set to false to disable frame saving
+// ExternalDirectoryPath = /storage/emulated/0/Android/data/com.patrolvisionapp/files/
+// No permissions needed on any Android version — always writable by the app
+const DEBUG_FRAMES_DIR = `${RNFS.ExternalDirectoryPath}/PatrolVision_Debug`;
+
+const initDebugFolder = async () => {
+  const exists = await RNFS.exists(DEBUG_FRAMES_DIR);
+  if (exists) await RNFS.unlink(DEBUG_FRAMES_DIR);
+  await RNFS.mkdir(DEBUG_FRAMES_DIR);
+  console.log(`[DEBUG] Folder ready: ${DEBUG_FRAMES_DIR}`);
+};
 
 const FRAMES_BATCH_SIZE = 4;
 const EXTRACTION_FPS = 4;
@@ -219,23 +233,38 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
     const expectedFramesCount = Math.floor(totalMs / intervalMs) + 1;
     const extractedFrames = [];
 
+    if (DEBUG_SAVE_FRAMES) await initDebugFolder();
+
     for (let timeMs = 0; timeMs <= totalMs; timeMs += intervalMs) {
       try {
         const thumb = await createThumbnail({ url: videoFileRef.current.uri, timeStamp: timeMs,
-          maxWidth: 1920,   
-          maxHeight: 1080});
+          maxWidth: 1920,
+          maxHeight: 1080,
+          onlySyncedFrames: false });
         const framePath = thumb.path.startsWith('file://') ? thumb.path : 'file://' + thumb.path;
         extractedFrames.push(framePath);
         setLoadingProgress(Math.round((extractedFrames.length / expectedFramesCount) * 100));
+
+        // ── Debug: copy immediately before createThumbnail overwrites the temp file ──
+        if (DEBUG_SAVE_FRAMES) {
+          const frameIndex = extractedFrames.length - 1;
+          const batchNum = Math.floor(frameIndex / FRAMES_BATCH_SIZE);
+          const numInBatch = frameIndex % FRAMES_BATCH_SIZE;
+          const destPath = `${DEBUG_FRAMES_DIR}/frame${batchNum}_${numInBatch}.jpg`;
+          await RNFS.copyFile(thumb.path.replace('file://', ''), destPath);
+        }
       } catch (err) {
-        extractedFrames.push(null); 
+        extractedFrames.push(null);
       }
+    }
+
+    if (DEBUG_SAVE_FRAMES) {
+      console.log(`[DEBUG] Saved ${extractedFrames.filter(Boolean).length} frames to: ${DEBUG_FRAMES_DIR}`);
     }
 
     preloadedFramesRef.current = extractedFrames;
     lastSentFrameIndexRef.current = -1;
     framesBatchRef.current = [];
-    
     setStatus('analyzing');
     setIsPaused(false);
     showControls();
