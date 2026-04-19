@@ -27,6 +27,12 @@ const FILTER_TYPES = [
   { id: 'Public Lane Violation', label: 'Public Lane' },
 ];
 
+const getImageUrl = (url) => {
+  if (!url) return 'https://via.placeholder.com/80?text=No+Image';
+  if (url.startsWith('http')) return url;
+  return `${SERVER_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 const getViolationStyle = (type) => {
   switch (type) {
     case 'Red Light Violation':
@@ -100,7 +106,7 @@ const ViolationItem = ({ item, onPress }) => {
         </View>
       </View>
       
-      <Image source={{ uri: `${SERVER_URL}/${item.mediaUrl}` }} style={styles.thumbnail} resizeMode="cover" />
+      <Image source={{ uri: getImageUrl(item.mediaUrl) }} style={styles.thumbnail} resizeMode="cover" />
     </Pressable>
   );
 };
@@ -147,7 +153,11 @@ const ViolationsHistoryScreen = ({ navigation }) => {
       if (shouldRefresh) {
         setViolations(newViolations);
       } else {
-        setViolations(prev => [...prev, ...newViolations]);
+        setViolations(prev => {
+          const existingIds = new Set(prev.map(v => v._id));
+          const unique = newViolations.filter(v => !existingIds.has(v._id));
+          return [...prev, ...unique];
+        });
       }
 
       setHasMore(!!serverResponse.pagination?.next);

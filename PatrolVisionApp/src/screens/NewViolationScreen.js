@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
-  Image, 
-  StyleSheet, 
+  Image,  
   Vibration, 
   StatusBar
 } from 'react-native';
@@ -11,11 +10,11 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { reportViolation } from '../services/api';
 import { useAuth } from '../context/AuthContext'; 
 import styles from './NewViolationScreen.styles';
-import { COLORS } from '../theme/colors';
+
 
 const NewViolationScreen = ({ route, navigation }) => {
   // Accessing violation details passed from LiveCameraScreen
-  const { violationType, plate, imageUri, location,onReturnId } = route.params;
+  const { violationType, plate, imageUri, location,onReturnId } = route.params|| {};
   const { token } = useAuth();
 
   // Timestamp formatting
@@ -40,7 +39,7 @@ useEffect(() => {
       // sent the violation report
       const reportData = {
         violationType,
-        licensePlate: plate || null,
+        licensePlate: plate || 'Unidentified',
         imageUri,
         latitude: location?.latitude || 0,
         longitude: location?.longitude || 0,
@@ -50,6 +49,7 @@ useEffect(() => {
       let violationId = null;
 
       try {
+        console.log("Auto-reporting violation...", reportData);
         const result = await reportViolation(token, reportData);
         
         if (result.success && result.data?.data?._id) {
@@ -68,7 +68,6 @@ useEffect(() => {
       if (onReturnId ) {
         onReturnId( violationId || null );
       }
-
       // Navigate back to the previous screen  after processing
       if (navigation.canGoBack()) {
         navigation.goBack();

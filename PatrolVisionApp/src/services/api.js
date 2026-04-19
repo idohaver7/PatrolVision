@@ -14,26 +14,25 @@ const api = axios.create({
 });
 
 // --- Helper Function to handle Axios errors safely ---
+
+// --- Helper Function to handle Axios errors safely ---
 const handleApiError = (error) => {
   let errorMessage = 'An unexpected error occurred';
 
   if (error.response) {
-    // The request was made and the server responded with a status code
-    // that falls out of the range of 2xx
-    
-    // Use the custom error message sent from the server (e.g., "User already exists")
     errorMessage = error.response.data?.error || 'Server Error';
-    
+    console.log('❌ [API] Server responded with error:', error.response.status, error.response.data);
   } else if (error.request) {
-    // The request was made but no response was received
     errorMessage = 'No communication with the server. Check your internet connection.';
+    console.log('❌ [API] No response received. Code:', error.code, 'Message:', error.message);
   } else {
-    // Something happened in setting up the request that triggered an Error
     errorMessage = error.message;
+    console.log('❌ [API] Request setup error:', error.message);
   }
 
   return { success: false, error: errorMessage };
 };
+
 
 // --- Auth Services ---
 

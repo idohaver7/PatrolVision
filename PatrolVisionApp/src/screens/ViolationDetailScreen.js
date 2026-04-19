@@ -13,6 +13,12 @@ import styles from './ViolationDetailScreen.styles';
 import { COLORS } from '../theme/colors';
 import { SERVER_URL } from '../services/api';
 
+const getImageUrl = (url) => {
+  if (!url) return 'https://via.placeholder.com/80?text=No+Image';
+  if (url.startsWith('http')) return url;
+  return `${SERVER_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 const ViolationDetailScreen = ({ route }) => {
   
   //  Get the data passed directly from the History list
@@ -46,7 +52,7 @@ const ViolationDetailScreen = ({ route }) => {
         {/*  Header Image */}
         <View style={styles.imageContainer}>
           <Image 
-            source={{ uri: `${SERVER_URL}/${violation.mediaUrl}`}}
+            source={{ uri: getImageUrl(violation.mediaUrl) }}
             style={styles.image} 
             resizeMode="contain" 
             resizeMethod='resize'
