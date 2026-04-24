@@ -86,5 +86,5 @@ def debug_segmentation_families_clear_text(model_path, image_path, conf_threshol
 # הרצה
 if __name__ == "__main__":
     MODEL_PATH = 'traffic_model.pt'  # המודל שאימנת ב-Colab
-    IMAGE_PATH = 'PIC6.png' # התמונה לבדיקה
+    IMAGE_PATH = 'raw_incoming_1.jpg' # התמונה לבדיקה
     debug_segmentation_families_clear_text(MODEL_PATH, IMAGE_PATH)

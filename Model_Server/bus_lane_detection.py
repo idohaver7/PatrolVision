@@ -1,12 +1,13 @@
 # --- 🚌 BUS LANE DETECTION LOGIC ---
 import numpy as np
 import time
-from utils import get_unified_line_x, extract_license_plate, get_center_bottom,is_far
+from utils import get_unified_line_x, extract_license_plate, get_center_bottom, is_far, prune_old_entries, should_report_violation
 CLEANING_TIME_SECONDS = 60
 CLEANING_TIME_SECONDS_TAXI = 600
 CAR_HEIGHT_THRESHOLD = 0.2  # Minimum height in pixels to consider a detection as a car (to filter out small objects and false positives)
 #Memory to avoid reporting the same vehicle multiple times
-reported_violators = {} 
+reported_violators = {}  # track_id -> timestamp
+reported_plates = {}     # license_plate -> timestamp (second-line dedup if tracker drops a car and re-acquires it with a new ID)
 known_taxis = {}
 def is_taxi(car_coords, taxi_hats):
     cx1, cy1, cx2, cy2 = car_coords
@@ -29,12 +30,9 @@ def detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height=51
     current_time = time.time()
     
     #Clean up old reported violators
-    keys_to_remove = [k for k, v in reported_violators.items() if current_time - v > CLEANING_TIME_SECONDS]
-    for k in keys_to_remove:
-        del reported_violators[k]
-    taxi_keys_to_remove = [k for k, v in known_taxis.items() if current_time - v > CLEANING_TIME_SECONDS_TAXI]
-    for k in taxi_keys_to_remove:
-        del known_taxis[k]
+    prune_old_entries(reported_violators, current_time, CLEANING_TIME_SECONDS)
+    prune_old_entries(reported_plates, current_time, CLEANING_TIME_SECONDS)
+    prune_old_entries(known_taxis, current_time, CLEANING_TIME_SECONDS_TAXI)
    
 
     # catch the history of each tracked vehicle across the frames
@@ -48,7 +46,11 @@ def detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height=51
         dashed_lines = [
             np.array(det["coordinates"]) for det in frame_data["detections"]
             if det["class_name"] == "dashed_line" and det["type"] == "polygon"
-        ] 
+        ]
+        solid_lines = [
+            np.array(det["coordinates"]) for det in frame_data["detections"]
+            if det["class_name"] == "solid_line" and det["type"] == "polygon"
+        ]
         taxi_hats = [
             det["coordinates"] for det in frame_data["detections"]
             if det["class_name"] == "taxi_hat" and det["type"] == "box"
@@ -63,11 +65,12 @@ def detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height=51
                     known_taxis[track_id] = current_time  # Remember this ID as a taxi for future frames
             
                 if track_id not in vehicle_history:
-                    vehicle_history[track_id] = {"frames": [], "coords": [], "dashed_lines": [], "bus_lines": []}
+                    vehicle_history[track_id] = {"frames": [], "coords": [], "dashed_lines": [], "bus_lines": [], "solid_lines": []}
                 vehicle_history[track_id]["frames"].append(frame_idx)
                 vehicle_history[track_id]["coords"].append(car_coords)
                 vehicle_history[track_id]["dashed_lines"].append(dashed_lines)
                 vehicle_history[track_id]["bus_lines"].append(bus_lines)
+                vehicle_history[track_id]["solid_lines"].append(solid_lines)
     print(f"🚗 Found {len(vehicle_history)} unique tracked vehicles (with IDs).")       
     # analyze the history of each vehicle to detect violations
     for track_id, history in vehicle_history.items():
@@ -80,7 +83,7 @@ def detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height=51
         last_frame_idx = None
         print(f"\n🔍 Checking Vehicle ID: {track_id} (Appeared in {len(history['frames'])} frames)")
         # Run all over the frames of this vehicle
-        for frame_idx, coords, bus_lines, dashed_lines in zip(history["frames"], history["coords"], history["bus_lines"], history["dashed_lines"]):
+        for frame_idx, coords, bus_lines, dashed_lines, solid_lines in zip(history["frames"], history["coords"], history["bus_lines"], history["dashed_lines"], history["solid_lines"]):
             total_frames_checked += 1
             # if there are no bus lines in this frame, we can't check for violation, so we skip it
             if len(bus_lines) == 0:
@@ -108,6 +111,25 @@ def detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height=51
                 else:
                     bus_lane_side = "left"
             
+            # Reject cars separated from the bus line by another lane divider — they're in a
+            # different lane, not the bus lane. Check each dashed/solid polygon individually
+            # (unifying them would average lanes together and hide the separation).
+            separator_polygons = list(dashed_lines) + list(solid_lines)
+            low_x = min(car_bottom_x, bus_line_x)
+            high_x = max(car_bottom_x, bus_line_x)
+            separator_between = False
+            for sep_poly in separator_polygons:
+                sep_x = get_unified_line_x([sep_poly], car_bottom_y)
+                if sep_x is None:
+                    continue
+                if low_x < sep_x < high_x:
+                    separator_between = True
+                    break
+
+            if separator_between:
+                print(f"   ↔️ Frame {frame_idx}: A lane divider sits between car and bus line. Not in bus lane.")
+                continue
+
             # the check if the car is driving in the bus lane
             if bus_lane_side == "right" and car_bottom_x > bus_line_x:
                 violation_count += 1
@@ -119,16 +141,11 @@ def detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height=51
         # determine based on the number of frames with violation if this vehicle is violating the bus lane rule
         if total_frames_checked > 0 and violation_count >= (total_frames_checked / 2.0):
             
-            if track_id in reported_violators:
-                print(f"   ♻️ SKIP: Bus lane violation already reported for ID {track_id}.")
-                reported_violators[track_id] = current_time  # Update the timestamp to extend the memory
-                continue
-                
-            reported_violators[track_id] = current_time
-            print(f"   🏆 >>> BUS LANE VIOLATION CONFIRMED FOR ID {track_id} <<<")
-            
             plate_text = extract_license_plate(history, batch_analysis, frames, lpr_model)
-            
+            if not should_report_violation(track_id, plate_text, current_time, reported_violators, reported_plates):
+                continue
+            print(f"   🏆 >>> BUS LANE VIOLATION CONFIRMED FOR ID {track_id} (plate={plate_text or 'N/A'}) <<<")
+
             return {
                 "violation": True,
                 "type": "Public Lane Violation",

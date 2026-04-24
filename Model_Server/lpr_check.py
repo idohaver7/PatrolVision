@@ -1,7 +1,7 @@
 import cv2
 from ultralytics import YOLO
 
-def test_lpr_model(image_path, model_path='lpr_model.pt', conf_threshold=0.20):
+def test_lpr_model(image_path, model_path='best.pt', conf_threshold=0.20):
     print(f"🚀 Loading LPR model from '{model_path}'...")
     try:
         model = YOLO(model_path)
@@ -77,4 +77,4 @@ def test_lpr_model(image_path, model_path='lpr_model.pt', conf_threshold=0.20):
 
 if __name__ == "__main__":
     # החלף את שם התמונה אם קראת לה בשם אחר
-    test_lpr_model("check.png", conf_threshold=0.45)
+    test_lpr_model("3.png", conf_threshold=0.45)

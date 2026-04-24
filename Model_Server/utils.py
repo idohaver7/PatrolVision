@@ -1,5 +1,13 @@
 import numpy as np
 import cv2
+
+# LPR model emits word class names ("zero".."nine") plus "dot" and "il" (Israeli emblem).
+# Map digit words to characters; anything not in this dict (dot, il) is dropped.
+LPR_WORD_TO_DIGIT = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+    "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+}
+
 # Utility functions for analyzing the batch of frames
 def is_far(car, image_height=512, threshold_ratio=0.05):
     coords = car["coordinates"]
@@ -16,6 +24,49 @@ def get_box_area(box_coords):
     # Calculates the area of a bounding box to help determine if a vehicle is getting closer (growing box) or farther (shrinking box)
     x1, y1, x2, y2 = box_coords
     return (x2 - x1) * (y2 - y1)
+def get_box_center(box):
+    """Returns the (x, y) center of a bounding box."""
+    return (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+
+# --- Geometric & Polygon Utilities ---
+
+def get_polygon_center(poly_coords):
+    """Finds the mean (x, y) center point of a polygon."""
+    pts = np.array(poly_coords)
+    cx = np.mean(pts[:, 0])
+    cy = np.mean(pts[:, 1])
+    return cx, cy
+
+def calculate_distance(p1, p2):
+    """Calculates the Euclidean distance between two points."""
+    return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+def get_unified_line_y(poly_coords, car_x):
+    """
+    Fits a straight line (1st degree polynomial) to the polygon points of a horizontal line (like a stop line),
+    and returns the exact Y position of the line at the specific X coordinate of the vehicle.
+    """
+    pts = np.array(poly_coords)
+    all_x = pts[:, 0]
+    all_y = pts[:, 1]
+    
+    # Fallback to simple average if not enough points
+    if len(all_x) < 2:
+        return np.mean(all_y)
+        
+    # Ensure unique X values to avoid polyfit errors (e.g., division by zero)
+    unique_x, indices = np.unique(all_x, return_index=True)
+    unique_y = all_y[indices]
+    
+    if len(unique_x) < 2:
+         return np.mean(all_y)
+
+    # Fit a 1st degree polynomial (y = mx + b)
+    curve_coefficients = np.polyfit(unique_x, unique_y, 1)
+    
+    # Calculate the exact Y position on the line for the given car_x
+    exact_line_y = np.polyval(curve_coefficients, car_x)
+    
+    return exact_line_y
 
 #Get all the polygons of the detected lines across the frames
 #fit a curve to the lines and return the relative X position of the line at a given vechicle Y position.
@@ -46,85 +97,125 @@ def get_unified_line_x(lines_polygons, car_y):
     
 #Extracts the license plate from the original high-resolution frame
 def extract_license_plate(history, batch_analysis, frames, lpr_model):
-    best_plate_crop = None
-    max_plate_area = 0
-    plate_text = ""
-    
-    #loop through the history of the car's positions and look for license plate detections in those frames.
+    # Collect every plate crop belonging to this car across its history, then try LPR
+    # from biggest plate to smallest — bigger = more pixels = more likely readable,
+    # so we typically succeed on the first try and skip the rest.
+    candidates = []  # list of (area, frame_idx, crop)
+
     for frame_idx, car_coords in zip(history["frames"], history["coords"]):
-        # Find the analysis data for this specific frame index
         frame_data = next((item for item in batch_analysis if item["frame_index"] == frame_idx), None)
         if not frame_data:
             continue
-            
-        # Look for license plate detections in this frame's analysis results
+
         for det in frame_data["detections"]:
-            if det["class_name"] == "license_plate":
-                px1, py1, px2, py2 = det["coordinates"]
-                cx1, cy1, cx2, cy2 = car_coords
-                
-                #Verify that the detected license plate is within the bounding box of the car in this frame
-                if px1 >= cx1 and py1 >= cy1 and px2 <= cx2 and py2 <= cy2:
-                    plate_area = (px2 - px1) * (py2 - py1)
-                    
-                    # Get the largest detected plate area across the frames
-                    if plate_area > max_plate_area:
-                        max_plate_area = plate_area
-                        
-                        
-                        padding_x = int((px2 - px1) * 0.1) # 10% width
-                        padding_y = int((py2 - py1) * 0.1) # 10% height
-                        
-                        # calculate the crop coordinates with padding
-                        orig_frame = frames[frame_idx]
-                        img_h, img_w = orig_frame.shape[:2]
-                        
-                        crop_x1 = max(0, int(px1) - padding_x)
-                        crop_y1 = max(0, int(py1) - padding_y)
-                        crop_x2 = min(img_w, int(px2) + padding_x)
-                        crop_y2 = min(img_h, int(py2) + padding_y)
-                        
-                        #crop from the original high-resolution frame
-                        best_plate_crop = orig_frame[crop_y1:crop_y2, crop_x1:crop_x2]
+            if det["class_name"] != "license_plate":
+                continue
+            px1, py1, px2, py2 = det["coordinates"]
+            cx1, cy1, cx2, cy2 = car_coords
 
-    # if we found a plate crop, we enhance it and run the LPR model to read the text
-    if best_plate_crop is not None and best_plate_crop.size > 0:
-        
-        
-        # 1. Enhance the plate crop ()
-        upscaled_plate = cv2.resize(best_plate_crop,(best_plate_crop.shape[1]*4, best_plate_crop.shape[0]*4), 
-                      interpolation=cv2.INTER_LANCZOS4 )
-        
-       
-        
-        cv2.imwrite("debug_plate.jpg", best_plate_crop) 
-        cv2.imwrite("debug_plate_upscaled.jpg", upscaled_plate) 
-        
-        # 3. הפעלת מודל ה-LPR
-        print("🔍 Running LPR model on optimized crop...")
-        lpr_results = lpr_model(upscaled_plate, conf=0.5) 
-        
-        
-        if len(lpr_results) > 0 and len(lpr_results[0].boxes) > 0:
-            
-            detected_chars = []
-            for box in lpr_results[0].boxes:
-               x1, _, x2, _ = box.xyxy[0].tolist()
-               cls_id = int(box.cls[0].item())
-               char_name = lpr_model.names[cls_id]
-               detected_chars.append({
-                "char": char_name,
-                "x_center": (x1 + x2) / 2.0
+            # Plate center must sit inside this car's bbox (expanded by 30px on each side
+            # to account for tracker model bbox being slightly tighter than the actual car)
+            plate_cx = (px1 + px2) / 2
+            plate_cy = (py1 + py2) / 2
+            margin = 30
+            if not (cx1 - margin <= plate_cx <= cx2 + margin and cy1 - margin <= plate_cy <= cy2 + margin):
+                continue
+
+            plate_area = (px2 - px1) * (py2 - py1)
+            padding_x = int((px2 - px1) * 0.1)
+            padding_y = int((py2 - py1) * 0.1)
+
+            orig_frame = frames[frame_idx]
+            img_h, img_w = orig_frame.shape[:2]
+
+            crop_x1 = max(0, int(px1) - padding_x)
+            crop_y1 = max(0, int(py1) - padding_y)
+            crop_x2 = min(img_w, int(px2) + padding_x)
+            crop_y2 = min(img_h, int(py2) + padding_y)
+
+            crop = orig_frame[crop_y1:crop_y2, crop_x1:crop_x2]
+            if crop.size > 0:
+                candidates.append((plate_area, frame_idx, crop))
+
+    if not candidates:
+        return ""
+
+    # Largest plate first — early exit on first successful read
+    candidates.sort(key=lambda c: c[0], reverse=True)
+
+    plate_text = "Unreadable"
+    for attempt_idx, (_, frame_idx, crop) in enumerate(candidates):
+        upscaled_plate = cv2.resize(
+            crop, (crop.shape[1] * 4, crop.shape[0] * 4),
+            interpolation=cv2.INTER_LANCZOS4,
+        )
+
+        # Save debug images only for the first attempt (largest plate)
+        if attempt_idx == 0:
+            cv2.imwrite("debug_plate.jpg", crop)
+            cv2.imwrite("debug_plate_upscaled.jpg", upscaled_plate)
+
+        print(f"🔍 LPR attempt {attempt_idx + 1}/{len(candidates)} (frame {frame_idx})...")
+        lpr_results = lpr_model(upscaled_plate, conf=0.5)
+
+        if len(lpr_results) == 0 or len(lpr_results[0].boxes) == 0:
+            continue
+
+        detected_chars = []
+        for box in lpr_results[0].boxes:
+            x1, _, x2, _ = box.xyxy[0].tolist()
+            cls_id = int(box.cls[0].item())
+            digit = LPR_WORD_TO_DIGIT.get(lpr_model.names[cls_id])
+            if digit is None:
+                continue
+            detected_chars.append({
+                "char": digit,
+                "x_center": (x1 + x2) / 2.0,
             })
-            
-            #sort the detected characters by their X coordinate to reconstruct the plate text in the correct order
-            detected_chars.sort(key=lambda d: d["x_center"]) 
-            plate_text = "".join([str(d["char"]) for d in detected_chars])
-            print(f"🔢 Plate Detected: {plate_text}")
-            if plate_text and len(plate_text) in [7, 8]:  # Assuming license plates have 7 or 8 digits
-                return plate_text
-        else:
-            print("⚠️ LPR model could not read the plate.")
-            plate_text = "Unreadable"
 
+        detected_chars.sort(key=lambda d: d["x_center"])
+        candidate_text = "".join(d["char"] for d in detected_chars)
+
+        if candidate_text and len(candidate_text) in [7, 8]:
+            print(f"🔢 Plate Detected: {candidate_text}")
+            return candidate_text
+
+        # Remember the best partial read in case every candidate fails validation
+        if candidate_text:
+            plate_text = candidate_text
+
+    print(f"⚠️ LPR failed validation on all {len(candidates)} candidates. Best guess: {plate_text}")
     return plate_text
+
+
+def prune_old_entries(d, current_time, ttl_seconds):
+    # Drop dict entries whose timestamp is older than ttl_seconds.
+    for k in [k for k, v in d.items() if current_time - v > ttl_seconds]:
+        del d[k]
+
+
+def should_report_violation(track_id, license_plate, current_time, reported_violators, reported_plates):
+    # Plate-first dedup with track_id fallback. Returns True if this violation
+    # should be reported now; updates the provided dicts as a side effect.
+    #
+    # A readable plate (7-8 chars) is the strongest identity signal, so we dedup on it
+    # and ignore prior track_id reports. This intentionally allows re-reporting a car
+    # that was previously reported without a plate, so police finally get an actionable LPR.
+    # Without a readable plate we fall back to track_id to avoid spamming the same car.
+    plate_is_valid = license_plate and license_plate != "Unreadable" and len(license_plate) in (7, 8)
+
+    if plate_is_valid:
+        if license_plate in reported_plates:
+            reported_plates[license_plate] = current_time
+            reported_violators[track_id] = current_time
+            print(f"   ⏩ Skipped: Plate {license_plate} was already reported recently.")
+            return False
+        reported_plates[license_plate] = current_time
+    else:
+        if track_id in reported_violators:
+            reported_violators[track_id] = current_time
+            print(f"   ⏩ Skipped: ID {track_id} was already reported recently (no plate to upgrade with).")
+            return False
+
+    reported_violators[track_id] = current_time
+    return True
