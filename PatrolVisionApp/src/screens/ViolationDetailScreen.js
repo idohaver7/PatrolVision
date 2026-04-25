@@ -40,7 +40,7 @@ const ViolationDetailScreen = ({ route }) => {
     if (!violation.location) return;
     // MongoDB stores as [longitude, latitude]
     const [lng, lat] = violation.location.coordinates;
-    // Opens Google Maps (or Waze) at this location
+    // Opens Google Maps
     const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
     Linking.openURL(url);
   };

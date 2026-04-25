@@ -70,7 +70,7 @@ exports.reportViolation = async (req, res) => {
       address = `${latitude}, ${longitude}`; 
     }
 
-    // 5. Create the record in the database
+    //  Create the record in the database
     const violation = await Violation.create({
       user: req.user._id,
       violationType,
@@ -81,7 +81,7 @@ exports.reportViolation = async (req, res) => {
       status: 'Pending Review'
     });
 
-    // 6. Populate user info and emit real-time event to dashboard
+    //  Populate user info and emit real-time event to dashboard
     const populatedViolation = await Violation.findById(violation._id)
       .populate('user', 'firstName lastName email phoneNumber');
 

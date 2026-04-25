@@ -120,7 +120,7 @@ const LiveCameraScreen = ({ navigation }) => {
       ])
     ).start();
 
-    // 2. Init permissions and GPS tracking
+    //  Init permissions and GPS tracking
     const initPermissions = async () => {
       if (hasPermission) {
         setIsCheckingPermission(false);
@@ -287,16 +287,6 @@ const LiveCameraScreen = ({ navigation }) => {
         quality: 85
       });
       const originalUri = 'file://' + photo.path;
-
-      // //resize the image to reduce file size before sending to server
-      // const resized = await ImageResizer.createResizedImage(
-      //   photo.path,
-      //   1024, 
-      //   768, 
-      //   'JPEG',
-      //   80,   
-      //   90     
-      // ); 
       const compressedUri = 'file://' + photo.path;
       framesBatchRef.current.push({
         original: originalUri,

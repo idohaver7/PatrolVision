@@ -258,9 +258,9 @@ async def analyze_sequence(files: List[UploadFile] = File(...), is_first_batch: 
                 has_solid_line = True
             elif class_name == "bus line":
                 has_bus_line = True    
-            elif class_name == "stop_line":         # <--- NEW
+            elif class_name == "stop_line":         
                 has_stop_line = True
-            elif class_name == "traffic_light_red": # <--- NEW
+            elif class_name == "traffic_light_red": 
                 has_red_light = True
                 
     # --- RUNNING DETECTION LOGICS ---

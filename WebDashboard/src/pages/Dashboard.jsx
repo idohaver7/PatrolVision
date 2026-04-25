@@ -125,10 +125,10 @@ const Dashboard = () => {
    */
   const filteredViolations = useMemo(() => {
     return allViolations.filter(v => {
-      // 1. Filter by Status Tab
+      //  Filter by Status Tab
       const matchesTab = v.status === currentTab;
       
-      // 2. Filter by Search Query (Plate, Address, User Name, Type)
+      // Filter by Search Query (Plate, Address, User Name, Type)
       const query = searchText.toLowerCase();
       const plate = v.licensePlate?.toLowerCase() || '';
       const address = v.address?.toLowerCase() || '';
@@ -141,7 +141,7 @@ const Dashboard = () => {
         userName.includes(query) ||
         type.includes(query);
 
-      // 3. Filter by Violation Type Dropdown
+      //  Filter by Violation Type Dropdown
       const matchesType = filterType === 'All Types' || v.violationType === filterType;
 
       return matchesTab && matchesSearch && matchesType;

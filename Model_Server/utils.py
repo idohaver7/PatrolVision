@@ -1,8 +1,7 @@
 import numpy as np
 import cv2
 
-# LPR model emits word class names ("zero".."nine") plus "dot" and "il" (Israeli emblem).
-# Map digit words to characters; anything not in this dict (dot, il) is dropped.
+
 LPR_WORD_TO_DIGIT = {
     "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
     "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",

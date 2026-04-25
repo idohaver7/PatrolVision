@@ -263,7 +263,7 @@ const ViolationsHistoryScreen = ({ navigation }) => {
     );
   }
 
-  // 2. Main List
+  //  Main List
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {renderFilters()}

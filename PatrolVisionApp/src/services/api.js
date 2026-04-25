@@ -2,7 +2,7 @@
 import axios from 'axios';
 import RNFS from 'react-native-fs';
 
-// ⚠️ IMPORTANT: Ensure this IP matches your computer's IP via 'ipconfig'
+
 export const SERVER_URL = 'http://192.168.1.35:5000'; 
 const BASE_URL = 'http://192.168.1.35:5000/api'; 
 const FASTAPI_URL = 'https://idohaver7-patrolvision.hf.space/analyze_batch';
