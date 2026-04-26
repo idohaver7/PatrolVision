@@ -1,0 +1,415 @@
+diff --git a/node_modules/react-native-create-thumbnail/android/.classpath b/node_modules/react-native-create-thumbnail/android/.classpath
+new file mode 100644
+index 0000000..bbe97e5
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/.classpath
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<classpath>
++	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-17/"/>
++	<classpathentry kind="con" path="org.eclipse.buildship.core.gradleclasspathcontainer"/>
++	<classpathentry kind="output" path="bin/default"/>
++</classpath>
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/8.9/checksums/checksums.lock b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/checksums/checksums.lock
+new file mode 100644
+index 0000000..71502fc
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/checksums/checksums.lock differ
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/8.9/checksums/md5-checksums.bin b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/checksums/md5-checksums.bin
+new file mode 100644
+index 0000000..c83e26e
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/checksums/md5-checksums.bin differ
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/8.9/checksums/sha1-checksums.bin b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/checksums/sha1-checksums.bin
+new file mode 100644
+index 0000000..138068c
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/checksums/sha1-checksums.bin differ
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/8.9/dependencies-accessors/gc.properties b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/dependencies-accessors/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/8.9/executionHistory/executionHistory.lock b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/executionHistory/executionHistory.lock
+new file mode 100644
+index 0000000..c969f88
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/executionHistory/executionHistory.lock differ
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/8.9/fileChanges/last-build.bin b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/fileChanges/last-build.bin
+new file mode 100644
+index 0000000..f76dd23
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/fileChanges/last-build.bin differ
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/8.9/fileHashes/fileHashes.lock b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/fileHashes/fileHashes.lock
+new file mode 100644
+index 0000000..a7e2313
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/fileHashes/fileHashes.lock differ
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/8.9/gc.properties b/node_modules/react-native-create-thumbnail/android/.gradle/8.9/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock b/node_modules/react-native-create-thumbnail/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+new file mode 100644
+index 0000000..b2306f1
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/.gradle/buildOutputCleanup/buildOutputCleanup.lock differ
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/buildOutputCleanup/cache.properties b/node_modules/react-native-create-thumbnail/android/.gradle/buildOutputCleanup/cache.properties
+new file mode 100644
+index 0000000..d5ad305
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/.gradle/buildOutputCleanup/cache.properties
+@@ -0,0 +1,2 @@
++#Wed Apr 15 16:48:47 IDT 2026
++gradle.version=8.9
+diff --git a/node_modules/react-native-create-thumbnail/android/.gradle/vcs-1/gc.properties b/node_modules/react-native-create-thumbnail/android/.gradle/vcs-1/gc.properties
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-create-thumbnail/android/.project b/node_modules/react-native-create-thumbnail/android/.project
+index 0e0a1ba..1004f78 100644
+--- a/node_modules/react-native-create-thumbnail/android/.project
++++ b/node_modules/react-native-create-thumbnail/android/.project
+@@ -1,10 +1,15 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <projectDescription>
+-	<name>android_</name>
++	<name>react-native-create-thumbnail</name>
+ 	<comment>Project android_ created by Buildship.</comment>
+ 	<projects>
+ 	</projects>
+ 	<buildSpec>
++		<buildCommand>
++			<name>org.eclipse.jdt.core.javabuilder</name>
++			<arguments>
++			</arguments>
++		</buildCommand>
+ 		<buildCommand>
+ 			<name>org.eclipse.buildship.core.gradleprojectbuilder</name>
+ 			<arguments>
+@@ -12,6 +17,18 @@
+ 		</buildCommand>
+ 	</buildSpec>
+ 	<natures>
++		<nature>org.eclipse.jdt.core.javanature</nature>
+ 		<nature>org.eclipse.buildship.core.gradleprojectnature</nature>
+ 	</natures>
++	<filteredResources>
++		<filter>
++			<id>1775639480474</id>
++			<name></name>
++			<type>30</type>
++			<matcher>
++				<id>org.eclipse.core.resources.regexFilterMatcher</id>
++				<arguments>node_modules|\.git|__CREATED_BY_JAVA_LANGUAGE_SERVER__</arguments>
++			</matcher>
++		</filter>
++	</filteredResources>
+ </projectDescription>
+diff --git a/node_modules/react-native-create-thumbnail/android/.settings/org.eclipse.buildship.core.prefs b/node_modules/react-native-create-thumbnail/android/.settings/org.eclipse.buildship.core.prefs
+index 38cd0a6..15fb54a 100644
+--- a/node_modules/react-native-create-thumbnail/android/.settings/org.eclipse.buildship.core.prefs
++++ b/node_modules/react-native-create-thumbnail/android/.settings/org.eclipse.buildship.core.prefs
+@@ -2,7 +2,7 @@ arguments=
+ auto.sync=false
+ build.scans.enabled=false
+ connection.gradle.distribution=GRADLE_DISTRIBUTION(VERSION(6.0-20191016123526+0000))
+-connection.project.dir=
++connection.project.dir=../../../android
+ eclipse.preferences.version=1
+ gradle.user.home=
+ java.home=/Library/Java/JavaVirtualMachines/jdk1.8.0_201.jdk/Contents/Home
+diff --git a/node_modules/react-native-create-thumbnail/android/build/.transforms/692d1cca4cc903aac88f99c85ef6d154/results.bin b/node_modules/react-native-create-thumbnail/android/build/.transforms/692d1cca4cc903aac88f99c85ef6d154/results.bin
+new file mode 100644
+index 0000000..7ed749e
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/.transforms/692d1cca4cc903aac88f99c85ef6d154/results.bin
+@@ -0,0 +1 @@
++o/bundleLibRuntimeToDirDebug
+diff --git a/node_modules/react-native-create-thumbnail/android/build/.transforms/692d1cca4cc903aac88f99c85ef6d154/transformed/bundleLibRuntimeToDirDebug/desugar_graph.bin b/node_modules/react-native-create-thumbnail/android/build/.transforms/692d1cca4cc903aac88f99c85ef6d154/transformed/bundleLibRuntimeToDirDebug/desugar_graph.bin
+new file mode 100644
+index 0000000..601f245
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/.transforms/692d1cca4cc903aac88f99c85ef6d154/transformed/bundleLibRuntimeToDirDebug/desugar_graph.bin differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/.transforms/b9d9230f48332cc3b1e4f7dcac6ab170/results.bin b/node_modules/react-native-create-thumbnail/android/build/.transforms/b9d9230f48332cc3b1e4f7dcac6ab170/results.bin
+new file mode 100644
+index 0000000..0d259dd
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/.transforms/b9d9230f48332cc3b1e4f7dcac6ab170/results.bin
+@@ -0,0 +1 @@
++o/classes
+diff --git a/node_modules/react-native-create-thumbnail/android/build/.transforms/b9d9230f48332cc3b1e4f7dcac6ab170/transformed/classes/classes_dex/classes.dex b/node_modules/react-native-create-thumbnail/android/build/.transforms/b9d9230f48332cc3b1e4f7dcac6ab170/transformed/classes/classes_dex/classes.dex
+new file mode 100644
+index 0000000..5af3906
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/.transforms/b9d9230f48332cc3b1e4f7dcac6ab170/transformed/classes/classes_dex/classes.dex differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/generated/source/buildConfig/debug/com/reactlibrary/createthumbnail/BuildConfig.java b/node_modules/react-native-create-thumbnail/android/build/generated/source/buildConfig/debug/com/reactlibrary/createthumbnail/BuildConfig.java
+new file mode 100644
+index 0000000..c689236
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/generated/source/buildConfig/debug/com/reactlibrary/createthumbnail/BuildConfig.java
+@@ -0,0 +1,10 @@
++/**
++ * Automatically generated file. DO NOT MODIFY
++ */
++package com.reactlibrary.createthumbnail;
++
++public final class BuildConfig {
++  public static final boolean DEBUG = Boolean.parseBoolean("true");
++  public static final String LIBRARY_PACKAGE_NAME = "com.reactlibrary.createthumbnail";
++  public static final String BUILD_TYPE = "debug";
++}
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml b/node_modules/react-native-create-thumbnail/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml
+new file mode 100644
+index 0000000..c0d992c
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/AndroidManifest.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.reactlibrary.createthumbnail" >
++
++    <uses-sdk android:minSdkVersion="24" />
++
++    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
++    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
++
++</manifest>
+\ No newline at end of file
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json b/node_modules/react-native-create-thumbnail/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json
+new file mode 100644
+index 0000000..cc0067c
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/aapt_friendly_merged_manifests/debug/processDebugManifest/aapt/output-metadata.json
+@@ -0,0 +1,18 @@
++{
++  "version": 3,
++  "artifactType": {
++    "type": "AAPT_FRIENDLY_MERGED_MANIFESTS",
++    "kind": "Directory"
++  },
++  "applicationId": "com.reactlibrary.createthumbnail",
++  "variantName": "debug",
++  "elements": [
++    {
++      "type": "SINGLE",
++      "filters": [],
++      "attributes": [],
++      "outputFile": "AndroidManifest.xml"
++    }
++  ],
++  "elementType": "File"
++}
+\ No newline at end of file
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties b/node_modules/react-native-create-thumbnail/android/build/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties
+new file mode 100644
+index 0000000..1211b1e
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/aar_metadata/debug/writeDebugAarMetadata/aar-metadata.properties
+@@ -0,0 +1,6 @@
++aarFormatVersion=1.0
++aarMetadataVersion=1.0
++minCompileSdk=1
++minCompileSdkExtension=0
++minAndroidGradlePluginVersion=1.0.0
++coreLibraryDesugaringEnabled=false
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json b/node_modules/react-native-create-thumbnail/android/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json
+new file mode 100644
+index 0000000..9e26dfe
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/annotation_processor_list/debug/javaPreCompileDebug/annotationProcessors.json
+@@ -0,0 +1 @@
++{}
+\ No newline at end of file
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar b/node_modules/react-native-create-thumbnail/android/build/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar
+new file mode 100644
+index 0000000..a782255
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/intermediates/compile_library_classes_jar/debug/bundleLibCompileToJarDebug/classes.jar differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar b/node_modules/react-native-create-thumbnail/android/build/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar
+new file mode 100644
+index 0000000..744b164
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/intermediates/compile_r_class_jar/debug/generateDebugRFile/R.jar differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/compile_symbol_list/debug/generateDebugRFile/R.txt b/node_modules/react-native-create-thumbnail/android/build/intermediates/compile_symbol_list/debug/generateDebugRFile/R.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties b/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
+new file mode 100644
+index 0000000..56150ff
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties
+@@ -0,0 +1 @@
++#Wed Apr 08 12:15:35 IDT 2026
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml b/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
+new file mode 100644
+index 0000000..eab9e60
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/debug/packageDebugResources/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\debug\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="debug" generated-set="debug$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\debug\res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\build\generated\res\resValues\debug"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated" generated-set="generated$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\build\generated\res\resValues\debug"/></dataSet><mergedItems/></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/mergeDebugAssets/merger.xml b/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/mergeDebugAssets/merger.xml
+new file mode 100644
+index 0000000..5fccb38
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/mergeDebugAssets/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\assets"/></dataSet><dataSet config="debug" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\debug\assets"/></dataSet><dataSet config="generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\build\intermediates\shader_assets\debug\compileDebugShaders\out"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/mergeDebugJniLibFolders/merger.xml b/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/mergeDebugJniLibFolders/merger.xml
+new file mode 100644
+index 0000000..78e2190
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/mergeDebugJniLibFolders/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\jniLibs"/></dataSet><dataSet config="debug" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\debug\jniLibs"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/mergeDebugShaders/merger.xml b/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/mergeDebugShaders/merger.xml
+new file mode 100644
+index 0000000..4112906
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/incremental/mergeDebugShaders/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\shaders"/></dataSet><dataSet config="debug" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\debug\shaders"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/reactlibrary/createthumbnail/BuildConfig.class b/node_modules/react-native-create-thumbnail/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/reactlibrary/createthumbnail/BuildConfig.class
+new file mode 100644
+index 0000000..4d3d132
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/reactlibrary/createthumbnail/BuildConfig.class differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/reactlibrary/createthumbnail/CreateThumbnailModule.class b/node_modules/react-native-create-thumbnail/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/reactlibrary/createthumbnail/CreateThumbnailModule.class
+new file mode 100644
+index 0000000..2f86f71
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/reactlibrary/createthumbnail/CreateThumbnailModule.class differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/reactlibrary/createthumbnail/CreateThumbnailPackage.class b/node_modules/react-native-create-thumbnail/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/reactlibrary/createthumbnail/CreateThumbnailPackage.class
+new file mode 100644
+index 0000000..85e00f9
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/reactlibrary/createthumbnail/CreateThumbnailPackage.class differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt b/node_modules/react-native-create-thumbnail/android/build/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt
+new file mode 100644
+index 0000000..78ac5b8
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/local_only_symbol_list/debug/parseDebugLocalResources/R-def.txt
+@@ -0,0 +1,2 @@
++R_DEF: Internal format may change without notice
++local
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/manifest_merge_blame_file/debug/processDebugManifest/manifest-merger-blame-debug-report.txt b/node_modules/react-native-create-thumbnail/android/build/intermediates/manifest_merge_blame_file/debug/processDebugManifest/manifest-merger-blame-debug-report.txt
+new file mode 100644
+index 0000000..844e123
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/manifest_merge_blame_file/debug/processDebugManifest/manifest-merger-blame-debug-report.txt
+@@ -0,0 +1,14 @@
++1<?xml version="1.0" encoding="utf-8"?>
++2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++3    package="com.reactlibrary.createthumbnail" >
++4
++5    <uses-sdk android:minSdkVersion="24" />
++6
++7    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
++7-->C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:3:5-80
++7-->C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:3:22-78
++8    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
++8-->C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:4:5-79
++8-->C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:4:22-77
++9
++10</manifest>
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml b/node_modules/react-native-create-thumbnail/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml
+new file mode 100644
+index 0000000..c0d992c
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/merged_manifest/debug/processDebugManifest/AndroidManifest.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.reactlibrary.createthumbnail" >
++
++    <uses-sdk android:minSdkVersion="24" />
++
++    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
++    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
++
++</manifest>
+\ No newline at end of file
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json b/node_modules/react-native-create-thumbnail/android/build/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json
+new file mode 100644
+index 0000000..0637a08
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/navigation_json/debug/extractDeepLinksDebug/navigation.json
+@@ -0,0 +1 @@
++[]
+\ No newline at end of file
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt b/node_modules/react-native-create-thumbnail/android/build/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt
+new file mode 100644
+index 0000000..08f4ebe
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/nested_resources_validation_report/debug/generateDebugResources/nestedResourcesValidationReport.txt
+@@ -0,0 +1 @@
++0 Warning/Error
+\ No newline at end of file
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_dir/debug/bundleLibRuntimeToDirDebug/com/reactlibrary/createthumbnail/BuildConfig.class b/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_dir/debug/bundleLibRuntimeToDirDebug/com/reactlibrary/createthumbnail/BuildConfig.class
+new file mode 100644
+index 0000000..4d3d132
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_dir/debug/bundleLibRuntimeToDirDebug/com/reactlibrary/createthumbnail/BuildConfig.class differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_dir/debug/bundleLibRuntimeToDirDebug/com/reactlibrary/createthumbnail/CreateThumbnailModule.class b/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_dir/debug/bundleLibRuntimeToDirDebug/com/reactlibrary/createthumbnail/CreateThumbnailModule.class
+new file mode 100644
+index 0000000..2f86f71
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_dir/debug/bundleLibRuntimeToDirDebug/com/reactlibrary/createthumbnail/CreateThumbnailModule.class differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_dir/debug/bundleLibRuntimeToDirDebug/com/reactlibrary/createthumbnail/CreateThumbnailPackage.class b/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_dir/debug/bundleLibRuntimeToDirDebug/com/reactlibrary/createthumbnail/CreateThumbnailPackage.class
+new file mode 100644
+index 0000000..85e00f9
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_dir/debug/bundleLibRuntimeToDirDebug/com/reactlibrary/createthumbnail/CreateThumbnailPackage.class differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar b/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar
+new file mode 100644
+index 0000000..eafcfc1
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar differ
+diff --git a/node_modules/react-native-create-thumbnail/android/build/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt b/node_modules/react-native-create-thumbnail/android/build/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt
+new file mode 100644
+index 0000000..88a2ea6
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/intermediates/symbol_list_with_package_name/debug/generateDebugRFile/package-aware-r.txt
+@@ -0,0 +1 @@
++com.reactlibrary.createthumbnail
+diff --git a/node_modules/react-native-create-thumbnail/android/build/outputs/logs/manifest-merger-debug-report.txt b/node_modules/react-native-create-thumbnail/android/build/outputs/logs/manifest-merger-debug-report.txt
+new file mode 100644
+index 0000000..02f971a
+--- /dev/null
++++ b/node_modules/react-native-create-thumbnail/android/build/outputs/logs/manifest-merger-debug-report.txt
+@@ -0,0 +1,25 @@
++-- Merging decision tree log ---
++manifest
++ADDED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:1:1-5:12
++INJECTED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:1:1-5:12
++	package
++		ADDED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:2:11-53
++		INJECTED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml
++	xmlns:android
++		ADDED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:1:11-69
++uses-permission#android.permission.WRITE_EXTERNAL_STORAGE
++ADDED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:3:5-80
++	android:name
++		ADDED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:3:22-78
++uses-permission#android.permission.READ_EXTERNAL_STORAGE
++ADDED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:4:5-79
++	android:name
++		ADDED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml:4:22-77
++uses-sdk
++INJECTED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml reason: use-sdk injection requested
++INJECTED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml
++INJECTED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml
++	android:targetSdkVersion
++		INJECTED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml
++	android:minSdkVersion
++		INJECTED from C:\barilan\PatrolVision\PatrolVisionApp\node_modules\react-native-create-thumbnail\android\src\main\AndroidManifest.xml
+diff --git a/node_modules/react-native-create-thumbnail/android/build/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin b/node_modules/react-native-create-thumbnail/android/build/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin
+new file mode 100644
+index 0000000..6e1a03c
+Binary files /dev/null and b/node_modules/react-native-create-thumbnail/android/build/tmp/compileDebugJavaWithJavac/previous-compilation-data.bin differ
+diff --git a/node_modules/react-native-create-thumbnail/android/src/main/java/com/createthumbnail/CreateThumbnailModule.java b/node_modules/react-native-create-thumbnail/android/src/main/java/com/createthumbnail/CreateThumbnailModule.java
+index ecc91d9..515468d 100644
+--- a/node_modules/react-native-create-thumbnail/android/src/main/java/com/createthumbnail/CreateThumbnailModule.java
++++ b/node_modules/react-native-create-thumbnail/android/src/main/java/com/createthumbnail/CreateThumbnailModule.java
+@@ -181,12 +181,13 @@ public class CreateThumbnailModule extends ReactContextBaseJavaModule {
+             retriever.setDataSource(filePath, headers);
+         }
+ 
++        int frameOption = onlySyncedFrames ? MediaMetadataRetriever.OPTION_CLOSEST_SYNC : MediaMetadataRetriever.OPTION_CLOSEST;
+         Bitmap image;
+         if (Build.VERSION.SDK_INT >= 27) {
+-            image = retriever.getScaledFrameAtTime(time * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, maxWidth, maxHeight);
++            image = retriever.getScaledFrameAtTime(time * 1000, frameOption, maxWidth, maxHeight);
+         } else {
+             // If on versions lower than API 27, use other methods to get frames
+-            image = retriever.getFrameAtTime(time * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
++            image = retriever.getFrameAtTime(time * 1000, frameOption);
+             if (image != null) {
+                 image = Bitmap.createScaledBitmap(image, maxWidth, maxHeight, true);
+             }

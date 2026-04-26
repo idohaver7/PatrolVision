@@ -1,12 +1,13 @@
 #--- 🕵️ SOLID LINE CROSSING DETECTION LOGIC ---
 import numpy as np
 import time
-from utils import get_center_bottom, get_box_area, get_unified_line_x, extract_license_plate,is_far
+from utils import get_center_bottom, get_box_area, get_unified_line_x, extract_license_plate, is_far, prune_old_entries, should_report_violation
 AREA_THRESHOLD = 1.2
 Y_MOVEMENT_THRESHOLD = 15
 PASSING_DISTANCE_THRESHOLD = 0.2
 CLEANING_TIME_SECONDS = 60  
-reported_violators = {}  # To keep track of already reported violations and avoid duplicates
+reported_violators = {}  # track_id -> timestamp
+reported_plates = {}     # license_plate -> timestamp (second-line dedup if tracker drops a car and re-acquires it with a new ID)
 #solid line crossing violation detection logic:
 def detect_solid_line_violation(batch_analysis, frames, lpr_model, image_height=512):
     print("\n--- 🕵️ DEBUG: STARTING SOLID LINE LOGIC ---")
@@ -14,9 +15,8 @@ def detect_solid_line_violation(batch_analysis, frames, lpr_model, image_height=
     vehicle_history = {} # Id History
     current_time = time.time()
     #clan up repored violators that were reported more than 1 minutes ago
-    keys_to_remove = [k for k, v in reported_violators.items() if current_time - v > CLEANING_TIME_SECONDS]
-    for k in keys_to_remove:
-        del reported_violators[k]
+    prune_old_entries(reported_violators, current_time, CLEANING_TIME_SECONDS)
+    prune_old_entries(reported_plates, current_time, CLEANING_TIME_SECONDS)
         
     
     for frame_data in batch_analysis:
@@ -56,8 +56,8 @@ def detect_solid_line_violation(batch_analysis, frames, lpr_model, image_height=
         end_area = get_box_area(end_coords)
         
         
-    #filtering based on movement direction and size change to reduce false positives of opposite direction cars.
-    #cars that moving  downwards and getting closer are moving in the opposite direction.
+        #filtering based on movement direction and size change to reduce false positives of opposite direction cars.
+        #cars that moving  downwards and getting closer are moving in the opposite direction.
         y_movement = end_y - start_y
         area_growth = end_area / start_area if start_area > 0 else 1
 
@@ -90,18 +90,15 @@ def detect_solid_line_violation(batch_analysis, frames, lpr_model, image_height=
             if car_x + PASSING_DISTANCE_THRESHOLD < exact_line_x:
                 print("      🚨 CROSSING DETECTED IN THIS FRAME!")
                 violation_count += 1
-                last_frame_idx = i
+                last_frame_idx = history["frames"][i]
         print(f"   ⚖️ Final Vote: {violation_count}/{total_frames_checked} frames with violation.")        
         # check if majority of the frames show violation to reduce false positives.
         if total_frames_checked > 0 and violation_count > (total_frames_checked / 2):
             # check if this violator was already reported in the last 1 minute to avoid duplicates
-            if track_id in reported_violators:
-                reported_violators[track_id] = current_time  # Update the timestamp to extend the cooldown
-                print(f"   ⏩ Skipped: Violation for ID {track_id} was already reported recently.")
+            license_plate = extract_license_plate(history, batch_analysis, frames, lpr_model)
+            if not should_report_violation(track_id, license_plate, current_time, reported_violators, reported_plates):
                 continue
-            reported_violators[track_id] = current_time  # Mark this violator as reported
-            print(f"   🏆 >>> VIOLATION CONFIRMED FOR ID {track_id} <<<")
-            license_plate = extract_license_plate(history, batch_analysis,frames,lpr_model)
+            print(f"   🏆 >>> VIOLATION CONFIRMED FOR ID {track_id} (plate={license_plate or 'N/A'}) <<<")
             return {
                 "violation": True,
                 "type": "Illegal Overtaking",

@@ -26,7 +26,7 @@ export default StyleSheet.create({
     marginTop: 4,
   },
   buttonContainer: {
-    width: '90%', // Make buttons wide
+    width: '90%', 
   },
   // Main button style
   button: {

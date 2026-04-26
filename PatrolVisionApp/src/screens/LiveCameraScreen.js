@@ -18,7 +18,10 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import KeepAwake from 'react-native-keep-awake'
 import Geolocation from 'react-native-geolocation-service';
 import ImageResizer from '@bam.tech/react-native-image-resizer';
-import { analyzeTrafficFrame } from '../services/api';
+import RNFS from 'react-native-fs';
+import { analyzeTrafficFrame, fetchViolationById } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import AnalysisResults from '../components/AnalysisResults';
 import styles from './LiveCameraScreen.styles';
 import { COLORS } from '../theme/colors';
 
@@ -83,6 +86,7 @@ const SwipeButton = ({ onSwipeSuccess }) => {
 
 const LiveCameraScreen = ({ navigation }) => {
   const { hasPermission, requestPermission } = useCameraPermission();
+  const { token } = useAuth();
   const [isCheckingPermission, setIsCheckingPermission] = useState(true);
   const device = useCameraDevice('back');
   const insets = useSafeAreaInsets();
@@ -90,6 +94,7 @@ const LiveCameraScreen = ({ navigation }) => {
   const cameraRef = useRef(null);
   const framesBatchRef = useRef([]);
   const isUploadingRef = useRef(false);
+  const pausedForViolationRef = useRef(false);
   //const lastProcessTime = useRef(0);
 
   // GPS State
@@ -97,6 +102,11 @@ const LiveCameraScreen = ({ navigation }) => {
   const locationRef = useRef(null);
   const [gpsStatus, setGpsStatus] = useState('searching'); // 'searching' | 'locked' | 'denied'
   const [speed, setSpeed] = useState(0);
+
+  // Trip violations
+  const [violations, setViolations] = useState([]);
+  const violationsRef = useRef([]);
+  const [showResults, setShowResults] = useState(false);
 
   // Rec animation
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -110,7 +120,7 @@ const LiveCameraScreen = ({ navigation }) => {
       ])
     ).start();
 
-    // 2. Init permissions and GPS tracking
+    //  Init permissions and GPS tracking
     const initPermissions = async () => {
       if (hasPermission) {
         setIsCheckingPermission(false);
@@ -215,14 +225,45 @@ const LiveCameraScreen = ({ navigation }) => {
           const locationToSend = locationRef.current || { latitude: 0, longitude: 0 };
           console.log("📍 Sending Location:", locationToSend);
           const winningIndex = result.data.last_violation_frame ?? (batch.length - 1);
-          const bestHighQualityImageUri = batch[winningIndex].original;
+          const sourceUri = batch[winningIndex].original;
+          const srcPath = sourceUri.replace('file://', '');
+          const stablePath = `${RNFS.CachesDirectoryPath}/violation-${Date.now()}.jpg`;
+          let bestHighQualityImageUri = sourceUri;
+          try {
+            await RNFS.copyFile(srcPath, stablePath);
+            bestHighQualityImageUri = 'file://' + stablePath;
+          } catch (copyErr) {
+            console.log('Evidence frame copy failed, falling back to original URI:', copyErr);
+          }
+
+          const newViolation = {
+            type: result.data.type,
+            plate: result.data.license_plate,
+            imageUri: bestHighQualityImageUri,
+            location: locationToSend,
+            timestamp: Date.now(),
+          };
+          violationsRef.current = [...violationsRef.current, newViolation];
+          setViolations([...violationsRef.current]);
+
+          pausedForViolationRef.current = true;
+          framesBatchRef.current = [];
 
           navigation.navigate('NewViolation', {
             violationType: result.data.type,
             plate: result.data.license_plate,
             imageUri: bestHighQualityImageUri, // send the best frame as evidence
             // sending the most recent location we have, or a default if we don't have one yet. The server can handle missing/zero coordinates if needed.
-            location: locationToSend
+            location: locationToSend,
+            onReturnId: (serverId) => {
+              if (serverId && violationsRef.current.length > 0) {
+                const last = violationsRef.current[violationsRef.current.length - 1];
+                last.serverId = serverId;
+                setViolations([...violationsRef.current]);
+              }
+              framesBatchRef.current = [];
+              pausedForViolationRef.current = false;
+            },
           });
       }
     } catch (err) {
@@ -236,7 +277,8 @@ const LiveCameraScreen = ({ navigation }) => {
   
   // process frame function with rate limiting
   const processFrame = async () => {
-    if (!cameraRef.current ) return;
+    if (!cameraRef.current) return;
+    if (pausedForViolationRef.current) return;
 
     try {
 
@@ -245,16 +287,6 @@ const LiveCameraScreen = ({ navigation }) => {
         quality: 85
       });
       const originalUri = 'file://' + photo.path;
-
-      // //resize the image to reduce file size before sending to server
-      // const resized = await ImageResizer.createResizedImage(
-      //   photo.path,
-      //   1024, 
-      //   768, 
-      //   'JPEG',
-      //   80,   
-      //   90     
-      // ); 
       const compressedUri = 'file://' + photo.path;
       framesBatchRef.current.push({
         original: originalUri,
@@ -301,10 +333,34 @@ const LiveCameraScreen = ({ navigation }) => {
     };
   }, []);
 
-  // handle end trip - stop GPS tracking and go back
+  // handle end trip - stop GPS tracking and show results
   const handleEndTrip = () => {
     Geolocation.stopObserving();
-    navigation.goBack();
+    setShowResults(true);
+  };
+
+  const viewViolationDetails = async (violation) => {
+    if (violation.serverId) {
+      const result = await fetchViolationById(token, violation.serverId);
+      if (result.success) {
+        navigation.navigate('ViolationDetail', { violation: result.data });
+        return;
+      }
+    }
+    const violationData = {
+      _id: `local_${Date.now()}`,
+      violationType: violation.type,
+      licensePlate: violation.plate || 'Unknown',
+      mediaUrl: violation.imageUri,
+      address: violation.location ? `${violation.location.latitude.toFixed(4)}, ${violation.location.longitude.toFixed(4)}` : 'Unknown',
+      location: violation.location ? {
+        type: 'Point',
+        coordinates: [violation.location.longitude, violation.location.latitude],
+      } : null,
+      status: 'Pending Review',
+      timestamp: new Date().toISOString(),
+    };
+    navigation.navigate('ViolationDetail', { violation: violationData });
   };
 
   // gps icon color based on status
@@ -367,6 +423,18 @@ const LiveCameraScreen = ({ navigation }) => {
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
         <SwipeButton onSwipeSuccess={handleEndTrip} />
       </View>
+
+      <AnalysisResults
+        visible={showResults}
+        violations={violations}
+        onViewDetails={viewViolationDetails}
+        onClose={() => { setShowResults(false); navigation.goBack(); }}
+        title="Trip Complete"
+        emptyMessage="No violations were detected during this trip"
+        closeLabel="End Trip"
+        closeIcon="check"
+      />
+
       <KeepAwake />
     </View>
   );

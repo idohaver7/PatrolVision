@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   TouchableWithoutFeedback,
   StatusBar,
@@ -13,16 +12,17 @@ import {
   Dimensions,
   ActivityIndicator,
   StyleSheet,
-  Modal,
 } from 'react-native';
 import Video from 'react-native-video';
-import { createThumbnail } from 'react-native-create-thumbnail'; 
+import { createThumbnail } from 'react-native-create-thumbnail';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import Geolocation from 'react-native-geolocation-service';
+import RNFS from 'react-native-fs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { analyzeTrafficFrame, warmupAnalysisServer, fetchViolationById } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import AnalysisResults from '../components/AnalysisResults';
 import styles from './VideoAnalysisScreen.styles';
 
 const FRAMES_BATCH_SIZE = 4;
@@ -70,26 +70,6 @@ const Scrubber = ({ progress, duration, onSeek }) => {
     </View>
   );
 };
-
-// ── Violation Card ────────────────────────────────────────
-const ViolationCard = ({ violation, index, onViewDetails }) => (
-  <View style={styles.violationCard}>
-    <View style={styles.violationCardLeft}>
-      <Icon name="warning" size={22} color="#FF6B35" />
-      <View style={styles.violationCardInfo}>
-        <Text style={styles.violationCardType}>{violation.type}</Text>
-        <Text style={styles.violationCardMeta}>
-          {formatTime(violation.videoTime)}
-          {violation.plate ? `   ${violation.plate}` : ''}
-        </Text>
-      </View>
-    </View>
-    <TouchableOpacity style={styles.viewDetailsBtn} onPress={() => onViewDetails(violation, index)}>
-      <Icon name="visibility" size={16} color="#FFF" />
-      <Text style={styles.viewDetailsBtnText}>Details</Text>
-    </TouchableOpacity>
-  </View>
-);
 
 const VideoAnalysisScreen = ({ navigation,route }) => {
   const insets = useSafeAreaInsets();
@@ -222,20 +202,20 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
     for (let timeMs = 0; timeMs <= totalMs; timeMs += intervalMs) {
       try {
         const thumb = await createThumbnail({ url: videoFileRef.current.uri, timeStamp: timeMs,
-          maxWidth: 1920,   
-          maxHeight: 1080});
+          maxWidth: 1920,
+          maxHeight: 1080,
+          onlySyncedFrames: false });
         const framePath = thumb.path.startsWith('file://') ? thumb.path : 'file://' + thumb.path;
         extractedFrames.push(framePath);
         setLoadingProgress(Math.round((extractedFrames.length / expectedFramesCount) * 100));
       } catch (err) {
-        extractedFrames.push(null); 
+        extractedFrames.push(null);
       }
     }
 
     preloadedFramesRef.current = extractedFrames;
     lastSentFrameIndexRef.current = -1;
     framesBatchRef.current = [];
-    
     setStatus('analyzing');
     setIsPaused(false);
     showControls();
@@ -334,10 +314,20 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
       }
       if (result.success && result.data.violation) {
         const winningIndex = result.data.last_violation_frame ?? batch.length - 1;
+        const sourceUri = batch[winningIndex].original;
+        const srcPath = sourceUri.replace('file://', '');
+        const stablePath = `${RNFS.CachesDirectoryPath}/violation-${Date.now()}.jpg`;
+        let stableUri = sourceUri;
+        try {
+          await RNFS.copyFile(srcPath, stablePath);
+          stableUri = 'file://' + stablePath;
+        } catch (copyErr) {
+          console.log('Evidence frame copy failed, falling back to original URI:', copyErr);
+        }
         const newViolation = {
           type: result.data.type,
           plate: result.data.license_plate,
-          imageUri: batch[winningIndex].original,
+          imageUri: stableUri,
           location: locationRef.current ?? { latitude: 0, longitude: 0 },
           videoTime: currentTimeRef.current,
         };
@@ -534,53 +524,13 @@ const VideoAnalysisScreen = ({ navigation,route }) => {
         </TouchableOpacity>
       )}
 
-      {/* Results Modal — full screen overlay when analysis is done/stopped */}
-      <Modal visible={showResults} animationType="slide" transparent>
-        <View style={styles.resultsOverlay}>
-          <View style={styles.resultsContainer}>
-            {/* Results Header */}
-            <View style={styles.resultsHeader}>
-              <Icon
-                name={violations.length > 0 ? 'report-problem' : 'verified'}
-                size={32}
-                color={violations.length > 0 ? '#FF6B35' : '#4CAF50'}
-              />
-              <Text style={styles.resultsTitle}>Analysis Complete</Text>
-              <Text style={styles.resultsSubtitle}>
-                {violations.length > 0
-                  ? `${violations.length} violation${violations.length > 1 ? 's' : ''} detected`
-                  : 'No violations were detected in this video'}
-              </Text>
-            </View>
-
-            {/* Violations List */}
-            <ScrollView style={styles.resultsList} contentContainerStyle={styles.resultsListContent} showsVerticalScrollIndicator={false}>
-              {violations.length === 0 ? (
-                <View style={styles.noViolationsBig}>
-                  <Icon name="check-circle" size={48} color="#4CAF50" />
-                  <Text style={styles.noViolationsBigText}>All clear! No traffic violations found.</Text>
-                </View>
-              ) : (
-                violations.map((v, i) => (
-                  <ViolationCard key={i} violation={v} index={i} onViewDetails={viewViolationDetails} />
-                ))
-              )}
-            </ScrollView>
-
-            {/* Results Actions */}
-            <View style={styles.resultsActions}>
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={() => { setShowResults(false); resetScreen(); }}
-                activeOpacity={0.8}
-              >
-                <Icon name="refresh" size={20} color="#FFF" />
-                <Text style={styles.secondaryButtonText}>New Analysis</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <AnalysisResults
+        visible={showResults}
+        violations={violations}
+        onViewDetails={viewViolationDetails}
+        onClose={() => { setShowResults(false); resetScreen(); }}
+        emptyMessage="No violations were detected in this video"
+      />
 
       <View style={styles.gpsRow}>
         <Icon name="gps-fixed" size={14} color={currentLocation ? '#4CAF50' : '#FFC107'} />
