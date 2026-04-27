@@ -57,9 +57,11 @@
 
 <div align="center">
 
-<a href="docs/videos/demo.mp4">
-  <img src="docs/images/app-live.jpg" height="800" width="600" alt="Click to watch demo video"/>
-</a>
+
+https://github.com/user-attachments/assets/cad06933-85c3-473a-98c2-b5d4efb81bb6
+
+
+
 
 <sub><i>Click the thumbnail above to play the demo video</i></sub>
 
