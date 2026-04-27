@@ -8,9 +8,19 @@ PASSING_DISTANCE_THRESHOLD = 0.2
 CLEANING_TIME_SECONDS = 60  
 reported_violators = {}  # track_id -> timestamp
 reported_plates = {}     # license_plate -> timestamp (second-line dedup if tracker drops a car and re-acquires it with a new ID)
+# Queue of confirmed violations waiting to be returned (one per call).
+# Plate is already resolved at queue time, so each entry is a ready-to-return result dict.
+_pending_violations = []
 #solid line crossing violation detection logic:
 def detect_solid_line_violation(batch_analysis, frames, lpr_model, image_height=512):
     print("\n--- 🕵️ DEBUG: STARTING SOLID LINE LOGIC ---")
+
+    # ── Return pending violations from previous batches first ─────────────
+    if _pending_violations:
+        pv = _pending_violations.pop(0)
+        print(f"📋 Returning pending solid line violation for ID {pv['track_id']} (queue size: {len(_pending_violations)})")
+        return pv
+
     #collect the history of each tracked vehicle across the frames
     vehicle_history = {} # Id History
     current_time = time.time()
@@ -39,6 +49,7 @@ def detect_solid_line_violation(batch_analysis, frames, lpr_model, image_height=
                 vehicle_history[track_id]["coords"].append(det["coordinates"])
                 vehicle_history[track_id]["lines"].append(lines_in_frame)
     print(f"🚗 Found {len(vehicle_history)} unique tracked vehicles (with IDs).")
+    confirmed = []
     #analayze the history of each vechicle to detect violations
     for track_id, history in vehicle_history.items():
         print(f"\n🔍 Checking Vehicle ID: {track_id} (Appeared in {len(history['frames'])} frames)")
@@ -99,14 +110,23 @@ def detect_solid_line_violation(batch_analysis, frames, lpr_model, image_height=
             if not should_report_violation(track_id, license_plate, current_time, reported_violators, reported_plates):
                 continue
             print(f"   🏆 >>> VIOLATION CONFIRMED FOR ID {track_id} (plate={license_plate or 'N/A'}) <<<")
-            return {
+            confirmed.append({
                 "violation": True,
                 "type": "Illegal Overtaking",
                 "license_plate": license_plate,
                 "last_violation_frame": last_frame_idx,
                 "track_id": track_id,
-                "vehicle_coords": end_coords, 
+                "vehicle_coords": end_coords,
                 "confidence_score": f"{violation_count}/{total_frames_checked} frames"
-            }
-    print("✅ No valid violations found in this batch.")
-    return {"violation": False}
+            })
+
+    if not confirmed:
+        print("✅ No valid violations found in this batch.")
+        return {"violation": False}
+
+    # Return the first violation now; queue the rest for subsequent calls
+    first = confirmed[0]
+    for extra in confirmed[1:]:
+        _pending_violations.append(extra)
+        print(f"📋 Queued solid line violation for ID {extra['track_id']} (pending: {len(_pending_violations)})")
+    return first

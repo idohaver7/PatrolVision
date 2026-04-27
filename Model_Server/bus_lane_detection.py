@@ -9,6 +9,9 @@ CAR_HEIGHT_THRESHOLD = 0.2  # Minimum height in pixels to consider a detection a
 reported_violators = {}  # track_id -> timestamp
 reported_plates = {}     # license_plate -> timestamp (second-line dedup if tracker drops a car and re-acquires it with a new ID)
 known_taxis = {}
+# Queue of confirmed violations waiting to be returned (one per call).
+# Plate is already resolved at queue time, so each entry is a ready-to-return result dict.
+_pending_violations = []
 def is_taxi(car_coords, taxi_hats):
     cx1, cy1, cx2, cy2 = car_coords
     car_height = cy2 - cy1
@@ -26,6 +29,13 @@ def is_taxi(car_coords, taxi_hats):
     return False
 def detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height=512):
     print("\n--- 🚌 DEBUG: STARTING BUS LANE LOGIC ---")
+
+    # ── Return pending violations from previous batches first ─────────────
+    if _pending_violations:
+        pv = _pending_violations.pop(0)
+        print(f"📋 Returning pending bus lane violation for ID {pv['track_id']} (queue size: {len(_pending_violations)})")
+        return pv
+
     vehicle_history = {} #Id History
     current_time = time.time()
     
@@ -71,7 +81,8 @@ def detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height=51
                 vehicle_history[track_id]["dashed_lines"].append(dashed_lines)
                 vehicle_history[track_id]["bus_lines"].append(bus_lines)
                 vehicle_history[track_id]["solid_lines"].append(solid_lines)
-    print(f"🚗 Found {len(vehicle_history)} unique tracked vehicles (with IDs).")       
+    print(f"🚗 Found {len(vehicle_history)} unique tracked vehicles (with IDs).")
+    confirmed = []
     # analyze the history of each vehicle to detect violations
     for track_id, history in vehicle_history.items():
         if track_id in known_taxis:
@@ -140,20 +151,28 @@ def detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height=51
                 
         # determine based on the number of frames with violation if this vehicle is violating the bus lane rule
         if total_frames_checked > 0 and violation_count >= (total_frames_checked / 2.0):
-            
+
             plate_text = extract_license_plate(history, batch_analysis, frames, lpr_model)
             if not should_report_violation(track_id, plate_text, current_time, reported_violators, reported_plates):
                 continue
             print(f"   🏆 >>> BUS LANE VIOLATION CONFIRMED FOR ID {track_id} (plate={plate_text or 'N/A'}) <<<")
 
-            return {
+            confirmed.append({
                 "violation": True,
                 "type": "Public Lane Violation",
                 "track_id": track_id,
                 "vehicle_coords": history["coords"][-1],
                 "license_plate": plate_text,
                 "last_violation_frame": last_frame_idx
-            }
+            })
 
-    print("✅ No valid bus lane violations found in this batch.")
-    return {"violation": False}
+    if not confirmed:
+        print("✅ No valid bus lane violations found in this batch.")
+        return {"violation": False}
+
+    # Return the first violation now; queue the rest for subsequent calls
+    first = confirmed[0]
+    for extra in confirmed[1:]:
+        _pending_violations.append(extra)
+        print(f"📋 Queued bus lane violation for ID {extra['track_id']} (pending: {len(_pending_violations)})")
+    return first
