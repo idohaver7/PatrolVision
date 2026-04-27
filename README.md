@@ -58,7 +58,7 @@
 <div align="center">
 
 <a href="docs/videos/demo.mp4">
-  <img src="docs/images/app-live.jpg" height="400" width="600" alt="Click to watch demo video"/>
+  <img src="docs/images/app-live.jpg" height="800" width="600" alt="Click to watch demo video"/>
 </a>
 
 <sub><i>Click the thumbnail above to play the demo video</i></sub>
