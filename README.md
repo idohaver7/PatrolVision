@@ -4,7 +4,7 @@
 
 ### AI-Powered Traffic Violation Detection Platform
 
-*Real-time enforcement of traffic laws using computer vision, deep learning, and a live patrol officer companion app.*
+*Real-time enforcement of traffic laws using computer vision, deep learning, and a companion app for **patrol officers and everyday drivers** alike.*
 
 ![PatrolVision Banner](docs/images/banner.png)
 
@@ -41,9 +41,19 @@
 
 ## Overview
 
-**PatrolVision** is a complete end-to-end platform that turns any patrol vehicle's smartphone into an intelligent traffic-violation detection system. Officers stream live road footage from their phone — the system analyses every frame with YOLO-based segmentation models, recognises license plates, classifies the violation, persists evidence, and broadcasts events in real time to a central web dashboard.
+**PatrolVision** is a complete end-to-end platform that turns any smartphone into an intelligent traffic-violation detection system. Drivers stream live road footage from their phone — the system analyses every frame with YOLO-based segmentation models, recognises license plates, classifies the violation, persists evidence, and broadcasts events in real time to a central web dashboard.
 
-> **One mission:** make traffic enforcement faster, more accurate, and fully evidence-backed.
+> **One mission:** make traffic enforcement faster, more accurate, and fully evidence-backed — by putting an AI traffic monitor in every car.
+
+### 👥 Who it's for
+
+PatrolVision is designed around a **dual-audience** model — every phone running the app becomes another set of eyes on the road:
+
+| 🚓 Patrol Officers | 🚗 Everyday Drivers |
+|:---:|:---:|
+| Use the app on duty as a force-multiplier for traditional enforcement — automatically flag violations they witness, without manual paperwork. | Use the app as a citizen-enforcement tool. Anyone on the road can contribute reliable, AI-verified, GPS-tagged evidence — effectively turning every driver into an extra "officer" out there. |
+
+The result: enforcement coverage scales with the number of users, not with the size of the police force. More users on the road = more accountability = safer streets.
 
 <!-- 📸 ADD HERE: Animated GIF of the full pipeline (phone → detection → dashboard alert)
      File location: docs/images/pipeline-demo.gif
@@ -53,13 +63,13 @@
 
 ## Demo
 
-🎬 **[▶️ Watch the full demo video](docs/videos/demo.mp4)** — see the entire flow from a phone capturing a road violation.
+🎬 **[▶️ Watch the full demo video](docs/videos/demo.mp4)** — see the entire flow from a phone capturing a road violation, to AI inference, to a real-time dashboard alert.
 
 <div align="center">
 
 
-https://github.com/user-attachments/assets/cad06933-85c3-473a-98c2-b5d4efb81bb6
 
+https://github.com/user-attachments/assets/9583f4d1-7c55-4d03-8a38-6fd04b1cd644
 
 
 
@@ -106,15 +116,15 @@ https://github.com/user-attachments/assets/cad06933-85c3-473a-98c2-b5d4efb81bb6
 
 ### 📱 Mobile App — PatrolVisionApp
 
-A React Native app built for the patrolling officer. The phone becomes the sensor: it captures the road, batches frames, sends them upstream, and surfaces violations the moment they happen.
+A React Native app built for **anyone driving on the road** — patrol officers and civilians alike. The phone becomes the sensor: it captures the road, batches frames, sends them upstream, and surfaces violations the moment they happen.
 
 #### Two modes of operation
 
-The app gives officers **two complementary ways** to analyse the road:
+The app gives users **two complementary ways** to analyse the road:
 
 | 📹 Live Camera Mode | 🎞️ Video Analysis Mode |
 |---|---|
-| **Real-time enforcement.** Stream live road footage from the patrol vehicle's phone. Frames are batched and dispatched to the model server every few seconds, so violations are flagged the moment they happen. | **Post-hoc review.** Pick an existing recording (dash-cam clip, evidence video) from the device and re-run the entire detection pipeline against it. Same logic, same accuracy — perfect for cases where live capture wasn't possible. |
+| **Real-time enforcement.** Mount the phone on the windshield and let the AI watch the road for you. Frames are batched and dispatched to the model server every few seconds, so violations are flagged the moment they happen. | **Post-hoc review.** Pick an existing recording (dash-cam clip, evidence video) from the device and re-run the entire detection pipeline against it. Same logic, same accuracy — perfect for cases where live capture wasn't possible. |
 | Powered by `react-native-vision-camera` + GPS tagging | Powered by `react-native-create-thumbnail` + `react-native-video` |
 
 #### Highlights
@@ -123,9 +133,9 @@ The app gives officers **two complementary ways** to analyse the road:
 - **GPS tagging** — every violation stamped with location via `react-native-geolocation-service`
 - **Violations History** — browse, filter, and inspect past evidence
 - **Violation Detail** — full-resolution evidence photo, plate, GPS coordinates, timestamp
-- **Manual Violation entry** — officers can also file a violation by hand
+- **Manual Violation entry** — users can also file a violation by hand
 - **Theming + Splash + Skeleton loaders** for a polished UX
-- **Keep-awake** during live capture so the screen never dims mid-patrol
+- **Keep-awake** during live capture so the screen never dims mid-drive
 
 <p align="center">
   <img src="docs/images/app-home.jpg" width="220" alt="Home screen"/>
@@ -185,7 +195,7 @@ The connective tissue. A Node.js + Express 5 server that handles authentication,
 
 ### 📊 Web Dashboard
 
-The command center. A React + Vite single-page app for supervisors to monitor the entire fleet of officers in real time.
+The command center. A React + Vite single-page app for traffic authorities and supervisors to monitor every reporting user — officer or civilian — in real time.
 
 **Highlights**
 - **Live map view** with `react-leaflet` — every violation pinned by GPS coordinates
