@@ -53,12 +53,12 @@
 
 ## Demo
 
-🎬 **[▶️ Watch the full demo video](docs/videos/demo.mp4)** — see the entire flow from a phone capturing a road violation, to AI inference, to a real-time dashboard alert.
+🎬 **[▶️ Watch the full demo video](docs/videos/demo.mp4)** — see the entire flow from a phone capturing a road violation.
 
 <div align="center">
 
 <a href="docs/videos/demo.mp4">
-  <img src="docs/images/app-live.jpg" width="600" alt="Click to watch demo video"/>
+  <img src="docs/images/app-live.jpg" height="400" width="600" alt="Click to watch demo video"/>
 </a>
 
 <sub><i>Click the thumbnail above to play the demo video</i></sub>
