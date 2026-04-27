@@ -149,11 +149,6 @@ def extract_license_plate(history, batch_analysis, frames, lpr_model):
             interpolation=cv2.INTER_LANCZOS4,
         )
 
-        # Save debug images only for the first attempt (largest plate)
-        if attempt_idx == 0:
-            cv2.imwrite("debug_plate.jpg", crop)
-            cv2.imwrite("debug_plate_upscaled.jpg", upscaled_plate)
-
         print(f"🔍 LPR attempt {attempt_idx + 1}/{len(candidates)} (frame {frame_idx})...")
         lpr_results = lpr_model(upscaled_plate, conf=0.5)
 

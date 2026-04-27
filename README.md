@@ -165,7 +165,6 @@ The brains of PatrolVision. A Python FastAPI service that runs **YOLO segmentati
   - 🚌 [bus_lane_detection.py](Model_Server/bus_lane_detection.py) — driving in a dedicated bus lane (with taxi exemption via `taxi_hat` class)
   - 🚦 [red_light_detection.py](Model_Server/red_light_detection.py) — running a red light, with cross-batch memory of approaching vehicles
 - **Warm-up phase** on startup compiles the PyTorch graph so the first real batch is fast
-- **Debug endpoints** — `/debug_image`, `/debug_violation`, `/debug_plate`, `/debug_first_frame`, `/debug_raw/{idx}` for end-to-end visual diagnostics
 
 <p align="center">
   <img src="docs/images/yolo-detection.jpg" width="700" alt="YOLO segmentation overlay — vehicles, lanes, and traffic lights detected in a single frame"/>

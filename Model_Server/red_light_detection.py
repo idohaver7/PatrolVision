@@ -26,7 +26,7 @@ reported_positions = {}
 # X-only threshold: cars in the same lane have similar X regardless of how far past the line they are
 POSITION_DEDUP_X_THRESHOLD = 150  # px — X distance to consider same lane
 
-# Anchored stop-line Y from the session's first frame (set by app.py)
+# Anchored stop-line Y, auto-set from the first batch that detects one
 session_stop_line_y = None
 
 # Tracks vehicles that were seen behind the stop line recently.
@@ -38,34 +38,6 @@ APPROACH_EXPIRY_SECONDS = 30
 # Queue of confirmed violations waiting to be returned (one per call).
 # Each entry: {"tid": int, "history": dict, "crossing_frame_idx": int}
 _pending_violations = []
-
-
-def set_session_stop_line(first_frame_data):
-    """
-    Called once per session (when is_first_batch=True) to reset all inter-batch
-    state and anchor the stop line Y from the first frame.
-    """
-    global session_stop_line_y
-    approaching_vehicles.clear()
-    _pending_violations.clear()
-    reported_violators.clear()
-    reported_positions.clear()
-    session_stop_line_y = None
-    print("🔄 Session reset: cleared all inter-batch state")
-    if first_frame_data is None:
-        return
-    stop_lines = [
-        np.array(det["coordinates"])
-        for det in first_frame_data["detections"]
-        if det["class_name"] == "stop_line" and det["type"] == "polygon"
-    ]
-    if stop_lines:
-        all_y = np.concatenate([poly[:, 1] for poly in stop_lines])
-        session_stop_line_y = float(np.mean(all_y))
-        print(f"📍 Session stop line anchored at Y = {session_stop_line_y:.1f}")
-    else:
-        session_stop_line_y = None
-        print("⚠️ No stop line found in first frame — will rely on per-batch detection")
 
 
 def _resolve_stop_line_y(stop_line_polygons, car_x, image_height=1080):
@@ -118,7 +90,6 @@ def detect_red_light_violation(batch_analysis, frames, lpr_model, image_height=5
             "track_id": pv["tid"],
             "license_plate": plate,
             "last_violation_frame": pv["crossing_frame_idx"],
-            "frame_image": pv.get("frame_image"),
         }
 
     vehicle_history = {}
@@ -146,7 +117,7 @@ def detect_red_light_violation(batch_analysis, frames, lpr_model, image_height=5
         print("⚠️ No red light now, but prior red-light approachers exist — checking cross-batch crossings...")
 
     # ── Step 2: Build vehicle history across the 4 frames ──────────────────
-    # Auto-anchor stop line from the first batch that detects one (don't rely on is_first_batch)
+    # Auto-anchor stop line from the first batch that detects one
     global session_stop_line_y
     if session_stop_line_y is None:
         for frame_data in batch_analysis:
@@ -346,7 +317,6 @@ def detect_red_light_violation(batch_analysis, frames, lpr_model, image_height=5
             "crossing_frame_idx": crossing_frame_idx,
             "car_x": car_x_viol,
             "car_y2": car_y2_viol,
-            "frame_image": frames[crossing_frame_idx],
         })
 
     # ── Return results ────────────────────────────────────────────────────
@@ -369,6 +339,4 @@ def detect_red_light_violation(batch_analysis, frames, lpr_model, image_height=5
         "track_id": first["tid"],
         "license_plate": plate,
         "last_violation_frame": first["crossing_frame_idx"],
-        "frame_index": first["crossing_frame_idx"],
-        "frame_image": first.get("frame_image"),
     }
