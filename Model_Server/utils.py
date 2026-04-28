@@ -39,33 +39,25 @@ def get_polygon_center(poly_coords):
 def calculate_distance(p1, p2):
     """Calculates the Euclidean distance between two points."""
     return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
-def get_unified_line_y(poly_coords, car_x):
-    """
-    Fits a straight line (1st degree polynomial) to the polygon points of a horizontal line (like a stop line),
-    and returns the exact Y position of the line at the specific X coordinate of the vehicle.
-    """
-    pts = np.array(poly_coords)
-    all_x = pts[:, 0]
-    all_y = pts[:, 1]
-    
-    # Fallback to simple average if not enough points
-    if len(all_x) < 2:
-        return np.mean(all_y)
-        
-    # Ensure unique X values to avoid polyfit errors (e.g., division by zero)
-    unique_x, indices = np.unique(all_x, return_index=True)
-    unique_y = all_y[indices]
-    
-    if len(unique_x) < 2:
-         return np.mean(all_y)
+#Get all the polygons of the detected horizontal lines (stop lines) across the frames
+#fit a 2nd-degree curve y(x) and return the Y position of the line at a given vehicle X position.
+def get_unified_stop_line_y(stop_line_polygons, car_x):
+    if not stop_line_polygons:
+        return None
 
-    # Fit a 1st degree polynomial (y = mx + b)
-    curve_coefficients = np.polyfit(unique_x, unique_y, 1)
-    
-    # Calculate the exact Y position on the line for the given car_x
-    exact_line_y = np.polyval(curve_coefficients, car_x)
-    
-    return exact_line_y
+    all_x = []
+    all_y = []
+    for poly in stop_line_polygons:
+        all_x.extend(poly[:, 0])
+        all_y.extend(poly[:, 1])
+
+    # Need at least 3 points to fit a quadratic; otherwise fall back to mean Y.
+    if len(all_x) < 3:
+        return float(np.mean(all_y))
+
+    curve_coefficients = np.polyfit(all_x, all_y, 2)
+    return float(np.polyval(curve_coefficients, car_x))
+
 
 #Get all the polygons of the detected lines across the frames
 #fit a curve to the lines and return the relative X position of the line at a given vechicle Y position.
@@ -121,16 +113,14 @@ def extract_license_plate(history, batch_analysis, frames, lpr_model):
                 continue
 
             plate_area = (px2 - px1) * (py2 - py1)
-            padding_x = int((px2 - px1) * 0.1)
-            padding_y = int((py2 - py1) * 0.1)
 
             orig_frame = frames[frame_idx]
             img_h, img_w = orig_frame.shape[:2]
 
-            crop_x1 = max(0, int(px1) - padding_x)
-            crop_y1 = max(0, int(py1) - padding_y)
-            crop_x2 = min(img_w, int(px2) + padding_x)
-            crop_y2 = min(img_h, int(py2) + padding_y)
+            crop_x1 = max(0, int(px1))
+            crop_y1 = max(0, int(py1))
+            crop_x2 = min(img_w, int(px2))
+            crop_y2 = min(img_h, int(py2))
 
             crop = orig_frame[crop_y1:crop_y2, crop_x1:crop_x2]
             if crop.size > 0:
@@ -189,14 +179,20 @@ def prune_old_entries(d, current_time, ttl_seconds):
 
 
 def should_report_violation(track_id, license_plate, current_time, reported_violators, reported_plates):
-    # Plate-first dedup with track_id fallback. Returns True if this violation
-    # should be reported now; updates the provided dicts as a side effect.
+    # Dedup by track_id and by plate. Returns True if this violation should be
+    # reported now; updates the provided dicts as a side effect.
     #
-    # A readable plate (7-8 chars) is the strongest identity signal, so we dedup on it
-    # and ignore prior track_id reports. This intentionally allows re-reporting a car
-    # that was previously reported without a plate, so police finally get an actionable LPR.
-    # Without a readable plate we fall back to track_id to avoid spamming the same car.
+    # If the track_id was already reported, skip — even when we now have a valid plate.
+    # The car is likely farther away on this re-detection, so a fresh LPR read is more
+    # likely to be wrong than the original report, and re-reporting just spams the same car.
     plate_is_valid = license_plate and license_plate != "Unreadable" and len(license_plate) in (7, 8)
+
+    if track_id in reported_violators:
+        reported_violators[track_id] = current_time
+        if plate_is_valid:
+            reported_plates[license_plate] = current_time
+        print(f"   ⏩ Skipped: ID {track_id} was already reported recently.")
+        return False
 
     if plate_is_valid:
         if license_plate in reported_plates:
@@ -205,11 +201,6 @@ def should_report_violation(track_id, license_plate, current_time, reported_viol
             print(f"   ⏩ Skipped: Plate {license_plate} was already reported recently.")
             return False
         reported_plates[license_plate] = current_time
-    else:
-        if track_id in reported_violators:
-            reported_violators[track_id] = current_time
-            print(f"   ⏩ Skipped: ID {track_id} was already reported recently (no plate to upgrade with).")
-            return False
 
     reported_violators[track_id] = current_time
     return True

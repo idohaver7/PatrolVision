@@ -1,10 +1,11 @@
 from fastapi import FastAPI, File, UploadFile
 from typing import List
+import os
 import uvicorn
 import numpy as np
 import cv2
 import io
-from PIL import Image,  ImageOps
+from PIL import Image
 from ultralytics import YOLO
 
 
@@ -37,7 +38,7 @@ vehicle_class_ids = [cid for cid, cname in model.names.items() if cname in VEHIC
 async def startup_event():
     print("🚀 WARMING UP MODELS: Sending warmup frames to compile PyTorch graphs...")
     try:
-        
+
         warmup_frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
 
         model.predict([warmup_frame], conf=0.25, classes=None)
@@ -46,7 +47,7 @@ async def startup_event():
 
         warmup_frame_lpr = np.zeros((224, 640, 3), dtype=np.uint8)
         lpr_model.predict([warmup_frame_lpr])
-        
+
         print("✅ WARMUP COMPLETE: Both models are hot and ready for the app!")
     except Exception as e:
         print(f"⚠️ WARMUP FAILED: {e}")
@@ -56,7 +57,6 @@ async def startup_event():
 async def root():
     print("🟢 Someone pinged the root URL!")
     return {"status": "PatrolVision API is running successfully!"}
-
 @app.post("/analyze_batch")
 async def analyze_sequence(files: List[UploadFile] = File(...)):
     print(f"🔥 CONNECTION RECEIVED! Got batch of {len(files)} frames from phone.")
@@ -167,10 +167,6 @@ async def analyze_sequence(files: List[UploadFile] = File(...)):
     
     # 1. Solid Line Detection
     if has_solid_line or _pending_solid_violations:
-        if _pending_solid_violations:
-            print("✔️ Pending solid line violations in queue. Running solid line logic...")
-        else:
-            print("✔️ Pre-check passed: Solid line found. Running solid line logic...")
         violation_result = detect_solid_line_violation(batch_analysis, frames, lpr_model, image_height)
         if violation_result.get("violation"):
             return violation_result
@@ -179,10 +175,6 @@ async def analyze_sequence(files: List[UploadFile] = File(...)):
 
     # 2. Bus Lane Detection
     if has_bus_line or _pending_bus_violations:
-        if _pending_bus_violations:
-            print("✔️ Pending bus lane violations in queue. Running bus lane logic...")
-        else:
-            print("✔️ Pre-check passed: Bus line found. Running bus lane logic...")
         violation_result = detect_bus_line_violation(batch_analysis, frames, lpr_model, image_height)
         if violation_result.get("violation"):
             return violation_result
@@ -190,14 +182,8 @@ async def analyze_sequence(files: List[UploadFile] = File(...)):
         print("⏩ Pre-check skipped: No bus line in batch.")
 
     # 3. Red Light Detection
-    has_prior_red_approachers = any(v[4] for v in approaching_vehicles.values())
+    has_prior_red_approachers = any(v[0] for v in approaching_vehicles.values())
     if has_red_light or _pending_red_violations or has_prior_red_approachers:
-        if _pending_red_violations:
-            print("✔️ Pending red light violations in queue. Running red light logic...")
-        elif has_prior_red_approachers and not has_red_light:
-            print("⚠️ No red light now, but prior red-light approachers exist — checking cross-batch crossings...")
-        else:
-            print("✔️ Pre-check passed: Red light found. Running red light logic...")
         violation_result = detect_red_light_violation(batch_analysis, frames, lpr_model, image_height)
         if violation_result.get("violation"):
             return violation_result
